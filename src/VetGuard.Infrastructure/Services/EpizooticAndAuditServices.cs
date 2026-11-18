@@ -166,91 +166,96 @@ public sealed class EpizooticService : IEpizooticService
         }
 
         var nowUtc = DateTime.UtcNow;
-        var isRelational = _db.Database.IsRelational();
-        await using var tx = isRelational
-            ? await _db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct)
-            : null;
+        var strategy = _db.Database.CreateExecutionStrategy();
 
-        try
+        return await strategy.ExecuteAsync(async () =>
         {
-            var rule = await _db.EpizooticRules.FirstOrDefaultAsync(r => r.Id == command.RuleId, ct)
-                ?? throw new DomainRuleException("Противоэпизоотическое правило не найдено.");
+            var isRelational = _db.Database.IsRelational();
+            await using var tx = isRelational
+                ? await _db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct)
+                : null;
 
-            var drug = await _db.VetDrugs.FirstOrDefaultAsync(d => d.Id == command.VetDrugId, ct)
-                ?? throw new DomainRuleException("Биопрепарат/вакцина не найдена на складе.");
-
-            var distinctIds = command.AnimalIds.Distinct().ToList();
-            var animals = await _db.Animals
-                .Where(a => distinctIds.Contains(a.Id) && !a.IsHistoricalPedigreeOnly)
-                .ToListAsync(ct);
-
-            if (animals.Count == 0)
+            try
             {
-                throw new DomainRuleException("Не выбрано ни одного действующего животного стада.");
-            }
+                var rule = await _db.EpizooticRules.FirstOrDefaultAsync(r => r.Id == command.RuleId, ct)
+                    ?? throw new DomainRuleException("Противоэпизоотическое правило не найдено.");
 
-            var totalDoses = animals.Count * command.DosePerAnimal;
+                var drug = await _db.VetDrugs.FirstOrDefaultAsync(d => d.Id == command.VetDrugId, ct)
+                    ?? throw new DomainRuleException("Биопрепарат/вакцина не найдена на складе.");
 
-            // Строгая проверка срока годности и списание вакцины по серии с защитой SQL Server rowversion!
-            drug.EnsureValidForAdministration(nowUtc);
-            drug.DeductStock(totalDoses);
+                var distinctIds = command.AnimalIds.Distinct().ToList();
+                var animals = await _db.Animals
+                    .Where(a => distinctIds.Contains(a.Id) && !a.IsHistoricalPedigreeOnly)
+                    .ToListAsync(ct);
 
-            var actNumber = $"АКТ-ЭПИЗ-{nowUtc:yyyyMMdd-HHmmss}";
-            var resultLabel = rule.EventType == EpizooticEventType.Vaccination
-                ? "Иммунизировано планово, поствакцинальных реакций нет"
-                : "Исследовано — реакция отрицательная (норма)";
-
-            var act = new EpizooticAct
-            {
-                ActNumber = actNumber,
-                EpizooticRuleId = rule.Id,
-                EpizooticRule = rule,
-                VetDrugId = drug.Id,
-                VetDrug = drug,
-                DrugNameSnapshot = drug.Name,
-                DrugSeriesSnapshot = drug.BatchSeries,
-                ExecutedAtUtc = nowUtc,
-                TargetBarn = string.IsNullOrWhiteSpace(command.TargetBarn) ? "Сводная группа по ферме ИрГАУ" : command.TargetBarn.Trim(),
-                DosePerAnimal = command.DosePerAnimal,
-                TotalDosesUsed = totalDoses,
-                ExecutedByVeterinarian = string.IsNullOrWhiteSpace(command.ExecutedByVeterinarian) ? "Главный ветврач ИрГАУ" : command.ExecutedByVeterinarian.Trim(),
-                WitnessZootechnician = string.IsNullOrWhiteSpace(command.WitnessZootechnician) ? "Ильина Е.С." : command.WitnessZootechnician.Trim(),
-                Notes = command.Notes?.Trim()
-            };
-
-            foreach (var animal in animals)
-            {
-                act.Items.Add(new EpizooticActItem
+                if (animals.Count == 0)
                 {
-                    EpizooticActId = act.Id,
-                    AnimalId = animal.Id,
-                    Animal = animal,
-                    ResultText = resultLabel,
-                    NextDueAtUtc = nowUtc.AddDays(rule.IntervalDays)
-                });
+                    throw new DomainRuleException("Не выбрано ни одного действующего животного стада.");
+                }
+
+                var totalDoses = animals.Count * command.DosePerAnimal;
+
+                // Строгая проверка срока годности и списание вакцины по серии с защитой SQL Server rowversion!
+                drug.EnsureValidForAdministration(nowUtc);
+                drug.DeductStock(totalDoses);
+
+                var actNumber = $"АКТ-ЭПИЗ-{nowUtc:yyyyMMdd-HHmmss}";
+                var resultLabel = rule.EventType == EpizooticEventType.Vaccination
+                    ? "Иммунизировано планово, поствакцинальных реакций нет"
+                    : "Исследовано — реакция отрицательная (норма)";
+
+                var act = new EpizooticAct
+                {
+                    ActNumber = actNumber,
+                    EpizooticRuleId = rule.Id,
+                    EpizooticRule = rule,
+                    VetDrugId = drug.Id,
+                    VetDrug = drug,
+                    DrugNameSnapshot = drug.Name,
+                    DrugSeriesSnapshot = drug.BatchSeries,
+                    ExecutedAtUtc = nowUtc,
+                    TargetBarn = string.IsNullOrWhiteSpace(command.TargetBarn) ? "Сводная группа по ферме ИрГАУ" : command.TargetBarn.Trim(),
+                    DosePerAnimal = command.DosePerAnimal,
+                    TotalDosesUsed = totalDoses,
+                    ExecutedByVeterinarian = string.IsNullOrWhiteSpace(command.ExecutedByVeterinarian) ? "Главный ветврач ИрГАУ" : command.ExecutedByVeterinarian.Trim(),
+                    WitnessZootechnician = string.IsNullOrWhiteSpace(command.WitnessZootechnician) ? "Ильина Е.С." : command.WitnessZootechnician.Trim(),
+                    Notes = command.Notes?.Trim()
+                };
+
+                foreach (var animal in animals)
+                {
+                    act.Items.Add(new EpizooticActItem
+                    {
+                        EpizooticActId = act.Id,
+                        AnimalId = animal.Id,
+                        Animal = animal,
+                        ResultText = resultLabel,
+                        NextDueAtUtc = nowUtc.AddDays(rule.IntervalDays)
+                    });
+                }
+
+                _db.EpizooticActs.Add(act);
+                await _db.SaveChangesAsync(ct);
+
+                if (tx is not null)
+                {
+                    await tx.CommitAsync(ct);
+                }
+
+                return act;
             }
-
-            _db.EpizooticActs.Add(act);
-            await _db.SaveChangesAsync(ct);
-
-            if (tx is not null)
+            catch (DbUpdateConcurrencyException ex)
             {
-                await tx.CommitAsync(ct);
-            }
+                if (tx is not null)
+                {
+                    await tx.RollbackAsync(ct);
+                }
 
-            return act;
-        }
-        catch (DbUpdateConcurrencyException ex)
-        {
-            if (tx is not null)
-            {
-                await tx.RollbackAsync(ct);
+                throw new ConcurrencyConflictException(
+                    "Конфликт конкурентного списания вакцины по серии (SQL rowversion): остаток биопрепарата был изменен параллельной транзакцией.",
+                    ex);
             }
-
-            throw new ConcurrencyConflictException(
-                "Конфликт конкурентного списания вакцины по серии (SQL rowversion): остаток биопрепарата был изменен параллельной транзакцией.",
-                ex);
-        }
+        });
     }
 }
 

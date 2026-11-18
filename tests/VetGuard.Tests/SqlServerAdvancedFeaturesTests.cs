@@ -19,9 +19,37 @@ public sealed class SqlServerAdvancedFeaturesTests
     private static VetGuardDbContext CreateSqlDbContext()
     {
         var options = new DbContextOptionsBuilder<VetGuardDbContext>()
-            .UseSqlServer(SqlConnectionString)
+            .UseSqlServer(SqlConnectionString, sql => sql.EnableRetryOnFailure(3))
             .Options;
         return new VetGuardDbContext(options);
+    }
+
+    [Fact]
+    public async Task SqlServer_TransactionalQuarantineLockWithRetryStrategy_ShouldRollbackAndLogIncident()
+    {
+        await using var db = CreateSqlDbContext();
+        await VetGuardDbSeeder.SeedAsync(db, NullLogger.Instance);
+
+        var zorka = await db.Animals.AsNoTracking().FirstAsync(a => a.TagNumber == "RU-38-IRGAU-0104");
+        var baykalka = await db.Animals.AsNoTracking().FirstAsync(a => a.TagNumber == "RU-38-IRGAU-0107");
+
+        var batchService = new ProductBatchService(db, new NoOpNotifier(), new CreateProductBatchCommandValidator());
+        var outcome = await batchService.CreateBatchWithQuarantineCheckAsync(new CreateProductBatchCommand
+        {
+            BatchNumber = $"MILK-SQL-TEST-{Guid.NewGuid():N}"[..24],
+            BatchType = ProductBatchType.RawMilk,
+            Destination = "АО Янтарь",
+            OperatorName = "Тест интеграции SQL Server",
+            Contributions = new List<BatchContributionInput>
+            {
+                new() { AnimalId = baykalka.Id, QuantityLitersOrKg = 31m },
+                new() { AnimalId = zorka.Id, QuantityLitersOrKg = 26m }
+            }
+        });
+
+        Assert.False(outcome.Succeeded);
+        Assert.Equal("RU-38-IRGAU-0104", outcome.BlockedAnimalTag);
+        Assert.Contains("Нитокс 200", outcome.BlockedDrugName);
     }
 
     private static IConfiguration CreateConfiguration()

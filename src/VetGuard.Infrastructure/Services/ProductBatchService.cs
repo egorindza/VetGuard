@@ -71,158 +71,173 @@ public sealed class ProductBatchService : IProductBatchService
         }
 
         var nowUtc = DateTime.UtcNow;
-        var isRelational = _db.Database.IsRelational();
-        await using var tx = isRelational
-            ? await _db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct)
-            : null;
+        var strategy = _db.Database.CreateExecutionStrategy();
 
-        try
+        var outcome = await strategy.ExecuteAsync(async () =>
         {
-            var animalIds = command.Contributions.Select(c => c.AnimalId).Distinct().ToList();
-            var animals = await _db.Animals
-                .Include(a => a.Treatments)
-                .ThenInclude(t => t.VetDrug)
-                .Where(a => animalIds.Contains(a.Id))
-                .ToDictionaryAsync(a => a.Id, ct);
+            var isRelational = _db.Database.IsRelational();
+            await using var tx = isRelational
+                ? await _db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct)
+                : null;
 
-            var batch = new ProductBatch
+            try
             {
-                BatchNumber = batchNumber,
-                BatchType = command.BatchType,
-                Status = BatchStatus.Draft,
-                CreatedAtUtc = nowUtc,
-                FatPercent = command.BatchType == ProductBatchType.RawMilk ? command.FatPercent : null,
-                ProteinPercent = command.BatchType == ProductBatchType.RawMilk ? command.ProteinPercent : null,
-                SomaticCellsThousands = command.BatchType == ProductBatchType.RawMilk ? command.SomaticCellsThousands : null,
-                Destination = command.Destination.Trim(),
-                CreatedByOperator = string.IsNullOrWhiteSpace(command.OperatorName) ? "Бригадир доильного зала" : command.OperatorName.Trim(),
-                Notes = command.Notes?.Trim()
-            };
+                var animalIds = command.Contributions.Select(c => c.AnimalId).Distinct().ToList();
+                var animals = await _db.Animals
+                    .Include(a => a.Treatments)
+                    .ThenInclude(t => t.VetDrug)
+                    .Where(a => animalIds.Contains(a.Id))
+                    .ToDictionaryAsync(a => a.Id, ct);
 
-            foreach (var contribution in command.Contributions)
-            {
-                if (!animals.TryGetValue(contribution.AnimalId, out var animal))
+                var batch = new ProductBatch
                 {
-                    throw new DomainRuleException($"Животное с идентификатором {contribution.AnimalId} не найдено.");
+                    BatchNumber = batchNumber,
+                    BatchType = command.BatchType,
+                    Status = BatchStatus.Draft,
+                    CreatedAtUtc = nowUtc,
+                    FatPercent = command.BatchType == ProductBatchType.RawMilk ? command.FatPercent : null,
+                    ProteinPercent = command.BatchType == ProductBatchType.RawMilk ? command.ProteinPercent : null,
+                    SomaticCellsThousands = command.BatchType == ProductBatchType.RawMilk ? command.SomaticCellsThousands : null,
+                    Destination = command.Destination.Trim(),
+                    CreatedByOperator = string.IsNullOrWhiteSpace(command.OperatorName) ? "Бригадир доильного зала" : command.OperatorName.Trim(),
+                    Notes = command.Notes?.Trim()
+                };
+
+                foreach (var contribution in command.Contributions)
+                {
+                    if (!animals.TryGetValue(contribution.AnimalId, out var animal))
+                    {
+                        throw new DomainRuleException($"Животное с идентификатором {contribution.AnimalId} не найдено.");
+                    }
+
+                    // Жесткий карантинный замок: выбросит QuarantineLockDomainException при активном выведении препарата!
+                    batch.AddAnimalContribution(animal, contribution.QuantityLitersOrKg, nowUtc);
                 }
 
-                // Жесткий карантинный замок: выбросит QuarantineLockDomainException при активном выведении препарата!
-                batch.AddAnimalContribution(animal, contribution.QuantityLitersOrKg, nowUtc);
+                _db.ProductBatches.Add(batch);
+                await _db.SaveChangesAsync(ct);
+
+                if (tx is not null)
+                {
+                    await tx.CommitAsync(ct);
+                }
+
+                return new BatchCreationOutcomeDto(
+                    Succeeded: true,
+                    BatchId: batch.Id,
+                    BatchNumber: batch.BatchNumber,
+                    Message: $"Партия № {batch.BatchNumber} ({batch.TotalVolumeLitersOrKg:0.0} {(batch.BatchType == ProductBatchType.RawMilk ? "л" : "кг")}) успешно сформирована и прошла проверку карантинного замка.");
             }
-
-            _db.ProductBatches.Add(batch);
-            await _db.SaveChangesAsync(ct);
-
-            if (tx is not null)
+            catch (QuarantineLockDomainException qEx)
             {
-                await tx.CommitAsync(ct);
-            }
+                if (tx is not null)
+                {
+                    await tx.RollbackAsync(ct);
+                }
 
-            return new BatchCreationOutcomeDto(
-                Succeeded: true,
-                BatchId: batch.Id,
-                BatchNumber: batch.BatchNumber,
-                Message: $"Партия № {batch.BatchNumber} ({batch.TotalVolumeLitersOrKg:0.0} {(batch.BatchType == ProductBatchType.RawMilk ? "л" : "кг")}) успешно сформирована и прошла проверку карантинного замка.");
-        }
-        catch (QuarantineLockDomainException qEx)
+                _db.ChangeTracker.Clear();
+
+                // Записываем неизменяемый журнал попытки нарушения карантина (отдельно после отката партии!)
+                var incident = new QuarantineBlockLog
+                {
+                    AttemptedAtUtc = nowUtc,
+                    AttemptedBatchNumber = batchNumber,
+                    BatchType = command.BatchType,
+                    AnimalId = qEx.AnimalId,
+                    AnimalTag = qEx.AnimalTag,
+                    AnimalName = qEx.AnimalName,
+                    ActiveDrugName = qEx.DrugName ?? "Карантинный изолятор",
+                    ActiveDrugSeries = qEx.DrugSeries,
+                    RemainingHours = Math.Round(qEx.RemainingHours, 2),
+                    AttemptedByUser = string.IsNullOrWhiteSpace(command.OperatorName) ? "Оператор доильного зала" : command.OperatorName,
+                    BlockMessage = qEx.Message
+                };
+
+                _db.QuarantineBlockLogs.Add(incident);
+                await _db.SaveChangesAsync(ct);
+
+                return new BatchCreationOutcomeDto(
+                    Succeeded: false,
+                    BatchId: null,
+                    BatchNumber: batchNumber,
+                    Message: qEx.Message,
+                    BlockedAnimalTag: qEx.AnimalTag,
+                    BlockedAnimalName: qEx.AnimalName,
+                    BlockedDrugName: qEx.DrugName,
+                    BlockedDrugSeries: qEx.DrugSeries,
+                    RemainingQuarantineHours: qEx.RemainingHours,
+                    ClearanceUtc: qEx.ClearanceUtc);
+            }
+        });
+
+        if (!outcome.Succeeded && !string.IsNullOrWhiteSpace(outcome.BlockedAnimalTag))
         {
-            if (tx is not null)
-            {
-                await tx.RollbackAsync(ct);
-            }
-
-            _db.ChangeTracker.Clear();
-
-            // Записываем неизменяемый журнал попытки нарушения карантина (отдельно после отката партии!)
-            var incident = new QuarantineBlockLog
-            {
-                AttemptedAtUtc = nowUtc,
-                AttemptedBatchNumber = batchNumber,
-                BatchType = command.BatchType,
-                AnimalId = qEx.AnimalId,
-                AnimalTag = qEx.AnimalTag,
-                AnimalName = qEx.AnimalName,
-                ActiveDrugName = qEx.DrugName ?? "Карантинный изолятор",
-                ActiveDrugSeries = qEx.DrugSeries,
-                RemainingHours = Math.Round(qEx.RemainingHours, 2),
-                AttemptedByUser = string.IsNullOrWhiteSpace(command.OperatorName) ? "Оператор доильного зала" : command.OperatorName,
-                BlockMessage = qEx.Message
-            };
-
-            _db.QuarantineBlockLogs.Add(incident);
-            await _db.SaveChangesAsync(ct);
-
             await _notifier.NotifyQuarantineViolationBlockedAsync(
-                batchNumber,
-                qEx.AnimalTag,
-                qEx.AnimalName,
-                qEx.DrugName,
-                qEx.RemainingHours,
-                incident.AttemptedByUser,
+                outcome.BatchNumber,
+                outcome.BlockedAnimalTag,
+                outcome.BlockedAnimalName ?? string.Empty,
+                outcome.BlockedDrugName,
+                outcome.RemainingQuarantineHours ?? 0,
+                string.IsNullOrWhiteSpace(command.OperatorName) ? "Оператор доильного зала" : command.OperatorName,
                 ct);
-
-            return new BatchCreationOutcomeDto(
-                Succeeded: false,
-                BatchId: null,
-                BatchNumber: batchNumber,
-                Message: qEx.Message,
-                BlockedAnimalTag: qEx.AnimalTag,
-                BlockedAnimalName: qEx.AnimalName,
-                BlockedDrugName: qEx.DrugName,
-                BlockedDrugSeries: qEx.DrugSeries,
-                RemainingQuarantineHours: qEx.RemainingHours,
-                ClearanceUtc: qEx.ClearanceUtc);
         }
+
+        return outcome;
     }
 
     public async Task<ProductBatch> ApproveBatchAsync(ApproveProductBatchCommand command, CancellationToken ct = default)
     {
         var nowUtc = DateTime.UtcNow;
-        var isRelational = _db.Database.IsRelational();
-        await using var tx = isRelational
-            ? await _db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct)
-            : null;
+        var strategy = _db.Database.CreateExecutionStrategy();
 
-        try
+        return await strategy.ExecuteAsync(async () =>
         {
-            var batch = await _db.ProductBatches
-                .Include(b => b.Items)
-                .FirstOrDefaultAsync(b => b.Id == command.BatchId, ct)
-                ?? throw new DomainRuleException("Партия продукции не найдена.");
+            var isRelational = _db.Database.IsRelational();
+            await using var tx = isRelational
+                ? await _db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct)
+                : null;
 
-            if (!string.IsNullOrWhiteSpace(command.ExpectedRowVersionBase64))
+            try
             {
-                _db.Entry(batch).Property(b => b.RowVersion).OriginalValue = Convert.FromBase64String(command.ExpectedRowVersionBase64);
+                var batch = await _db.ProductBatches
+                    .Include(b => b.Items)
+                    .FirstOrDefaultAsync(b => b.Id == command.BatchId, ct)
+                    ?? throw new DomainRuleException("Партия продукции не найдена.");
+
+                if (!string.IsNullOrWhiteSpace(command.ExpectedRowVersionBase64))
+                {
+                    _db.Entry(batch).Property(b => b.RowVersion).OriginalValue = Convert.FromBase64String(command.ExpectedRowVersionBase64);
+                }
+
+                var animalIds = batch.Items.Select(i => i.AnimalId).Distinct().ToList();
+                var animals = await _db.Animals
+                    .Include(a => a.Treatments)
+                    .ThenInclude(t => t.VetDrug)
+                    .Where(a => animalIds.Contains(a.Id))
+                    .ToListAsync(ct);
+
+                batch.ApproveByVeterinarian(animals, command.VeterinarianName, nowUtc);
+                await _db.SaveChangesAsync(ct);
+
+                if (tx is not null)
+                {
+                    await tx.CommitAsync(ct);
+                }
+
+                return batch;
             }
-
-            var animalIds = batch.Items.Select(i => i.AnimalId).Distinct().ToList();
-            var animals = await _db.Animals
-                .Include(a => a.Treatments)
-                .ThenInclude(t => t.VetDrug)
-                .Where(a => animalIds.Contains(a.Id))
-                .ToListAsync(ct);
-
-            batch.ApproveByVeterinarian(animals, command.VeterinarianName, nowUtc);
-            await _db.SaveChangesAsync(ct);
-
-            if (tx is not null)
+            catch (DbUpdateConcurrencyException ex)
             {
-                await tx.CommitAsync(ct);
-            }
+                if (tx is not null)
+                {
+                    await tx.RollbackAsync(ct);
+                }
 
-            return batch;
-        }
-        catch (DbUpdateConcurrencyException ex)
-        {
-            if (tx is not null)
-            {
-                await tx.RollbackAsync(ct);
+                throw new ConcurrencyConflictException(
+                    "Конфликт оптимистичной блокировки (SQL rowversion): партия была изменена другим пользователем до завершения ветеринарного допуска!",
+                    ex);
             }
-
-            throw new ConcurrencyConflictException(
-                "Конфликт оптимистичной блокировки (SQL rowversion): партия была изменена другим пользователем до завершения ветеринарного допуска!",
-                ex);
-        }
+        });
     }
 
     public async Task<ProductBatch> MarkShippedAsync(Guid batchId, CancellationToken ct = default)

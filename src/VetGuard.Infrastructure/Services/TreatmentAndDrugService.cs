@@ -137,72 +137,78 @@ public sealed class TreatmentAndDrugService : ITreatmentAndDrugService
             throw new DomainRuleException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
         }
 
-        var isRelational = _db.Database.IsRelational();
-        await using var tx = isRelational
-            ? await _db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
-            : null;
-
-        try
+        var strategy = _db.Database.CreateExecutionStrategy();
+        var (record, animalTag, animalName, drugName, milkHours, meatDays) = await strategy.ExecuteAsync(async () =>
         {
-            var animal = await _db.Animals
-                .Include(a => a.Treatments)
-                .FirstOrDefaultAsync(a => a.Id == command.AnimalId, ct)
-                ?? throw new DomainRuleException("Карточка животного не найдена.");
+            var isRelational = _db.Database.IsRelational();
+            await using var tx = isRelational
+                ? await _db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
+                : null;
 
-            var drug = await _db.VetDrugs
-                .FirstOrDefaultAsync(d => d.Id == command.VetDrugId, ct)
-                ?? throw new DomainRuleException("Ветпрепарат не найден.");
-
-            var administeredUtc = command.AdministeredAtUtc ?? DateTime.UtcNow;
-
-            var record = TreatmentRecord.Create(
-                animal,
-                drug,
-                command.DosageAmount,
-                command.AdministrationRoute,
-                command.Diagnosis,
-                administeredUtc,
-                command.VeterinarianName,
-                command.VeterinarianRole,
-                command.ClinicalNotes);
-
-            _db.TreatmentRecords.Add(record);
-            await _db.SaveChangesAsync(ct);
-
-            if (tx is not null)
+            try
             {
-                await tx.CommitAsync(ct);
-            }
+                var animal = await _db.Animals
+                    .Include(a => a.Treatments)
+                    .FirstOrDefaultAsync(a => a.Id == command.AnimalId, ct)
+                    ?? throw new DomainRuleException("Карточка животного не найдена.");
 
-            if (drug.MilkWithdrawalHours > 0 || drug.MeatWithdrawalDays > 0)
+                var drug = await _db.VetDrugs
+                    .FirstOrDefaultAsync(d => d.Id == command.VetDrugId, ct)
+                    ?? throw new DomainRuleException("Ветпрепарат не найден.");
+
+                var administeredUtc = command.AdministeredAtUtc ?? DateTime.UtcNow;
+
+                var created = TreatmentRecord.Create(
+                    animal,
+                    drug,
+                    command.DosageAmount,
+                    command.AdministrationRoute,
+                    command.Diagnosis,
+                    administeredUtc,
+                    command.VeterinarianName,
+                    command.VeterinarianRole,
+                    command.ClinicalNotes);
+
+                _db.TreatmentRecords.Add(created);
+                await _db.SaveChangesAsync(ct);
+
+                if (tx is not null)
+                {
+                    await tx.CommitAsync(ct);
+                }
+
+                return (created, animal.TagNumber, animal.Name, drug.Name, drug.MilkWithdrawalHours, drug.MeatWithdrawalDays);
+            }
+            catch (DbUpdateConcurrencyException ex)
             {
-                var primaryClearance = drug.MilkWithdrawalHours > 0
-                    ? record.MilkWithdrawalEndsAtUtc
-                    : record.MeatWithdrawalEndsAtUtc;
+                if (tx is not null)
+                {
+                    await tx.RollbackAsync(ct);
+                }
 
-                await _notifier.NotifyQuarantineLockActivatedAsync(
-                    animal.TagNumber,
-                    animal.Name,
-                    drug.Name,
-                    drug.MilkWithdrawalHours,
-                    drug.MeatWithdrawalDays,
-                    primaryClearance,
-                    ct);
+                throw new ConcurrencyConflictException(
+                    "Конфликт конкурентного списания ветпрепарата (rowversion): остаток серии или статус животного был параллельно изменен.",
+                    ex);
             }
+        });
 
-            return record;
-        }
-        catch (DbUpdateConcurrencyException ex)
+        if (milkHours > 0 || meatDays > 0)
         {
-            if (tx is not null)
-            {
-                await tx.RollbackAsync(ct);
-            }
+            var primaryClearance = milkHours > 0
+                ? record.MilkWithdrawalEndsAtUtc
+                : record.MeatWithdrawalEndsAtUtc;
 
-            throw new ConcurrencyConflictException(
-                "Конфликт конкурентного списания ветпрепарата (rowversion): остаток серии или статус животного был параллельно изменен.",
-                ex);
+            await _notifier.NotifyQuarantineLockActivatedAsync(
+                animalTag,
+                animalName,
+                drugName,
+                milkHours,
+                meatDays,
+                primaryClearance,
+                ct);
         }
+
+        return record;
     }
 
     public async Task<int> ProcessExpiredWithdrawalsAsync(CancellationToken ct = default)
