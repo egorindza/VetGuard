@@ -35,6 +35,8 @@ public sealed class PdfReportService : IPdfReportService
     static PdfReportService()
     {
         QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.UseSystemFonts = true;
+        QuestPDF.Settings.ThrowOnMissingTextGlyphs = false;
     }
 
     public PdfReportService(IQrCodeService qrCodeService)
@@ -119,7 +121,7 @@ public sealed class PdfReportService : IPdfReportService
                         row.ConstantItem(165).Border(1).BorderColor("#155e49").Padding(8).Column(qrCol =>
                         {
                             qrCol.Item().AlignCenter().Text("СКАН ДЛЯ ВЕТВРАЧА").FontSize(8.5f).Bold().FontColor("#155e49");
-                            qrCol.Item().PaddingVertical(4).Height(130).AlignCenter().Image(qrBytes);
+                            qrCol.Item().PaddingVertical(4).AlignCenter().Width(125).Height(125).Image(qrBytes).FitArea();
                             qrCol.Item().AlignCenter().Text(a.TagNumber).FontSize(8.5f).Bold();
                             qrCol.Item().AlignCenter().Text("Мобильный осмотр у стойла").FontSize(7.5f).FontColor("#64748b");
                         });
