@@ -1,0 +1,106 @@
+@model AnimalEditModalViewModel
+@{
+    var isEdit = Model.Command.Id.HasValue;
+}
+
+<form asp-controller="Animals" asp-action="Save" method="post">
+    <div class="vg-card-header">
+        <h5 class="fw-bold mb-0">@(isEdit ? $"Редактирование карточки: {Model.Command.Name}" : "Регистрация нового животного в стаде ИрГАУ")</h5>
+        <button type="button" class="btn-close" onclick="closeVgModal()"></button>
+    </div>
+
+    <div class="p-4">
+        @if (isEdit)
+        {
+            <input type="hidden" name="Id" value="@Model.Command.Id" />
+        }
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label small fw-semibold">Инвентарный номер ушной бирки *</label>
+                <input type="text" name="TagNumber" value="@Model.Command.TagNumber" class="form-control" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-semibold">RFID-чип (10–15 цифр ISO 11784)</label>
+                <input type="text" name="RfidChip" value="@Model.Command.RfidChip" class="form-control" placeholder="643098100038..." />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label small fw-semibold">Кличка животного *</label>
+                <input type="text" name="Name" value="@Model.Command.Name" class="form-control" required placeholder="Напр. Сибирячка-24" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Порода *</label>
+                <input type="text" name="Breed" value="@Model.Command.Breed" class="form-control" list="breedSuggestions" required />
+                <datalist id="breedSuggestions">
+                    <option value="Голштинская"></option>
+                    <option value="Черно-пестрая"></option>
+                    <option value="Симментальская"></option>
+                </datalist>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold">Пол *</label>
+                <select name="Sex" class="form-select">
+                    <option value="@AnimalSex.Female" selected="@(Model.Command.Sex == AnimalSex.Female)">♀ Самка</option>
+                    <option value="@AnimalSex.Male" selected="@(Model.Command.Sex == AnimalSex.Male)">♂ Самец</option>
+                </select>
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Дата рождения *</label>
+                <input type="date" name="BirthDate" value="@Model.Command.BirthDate.ToString("yyyy-MM-dd")" class="form-control" required />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Живая масса (кг) *</label>
+                <input type="number" step="0.1" name="CurrentWeightKg" value="@Model.Command.CurrentWeightKg" class="form-control" required />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Средний удой (л/сут, для коров)</label>
+                <input type="number" step="0.1" name="AverageDailyMilkKg" value="@Model.Command.AverageDailyMilkKg" class="form-control" />
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label small fw-semibold">Отец (Бык-производитель)</label>
+                <select name="SireId" class="form-select">
+                    <option value="">— Не указан / Внешний —</option>
+                    @foreach (var s in Model.PotentialSires)
+                    {
+                        <option value="@s.Id" selected="@(Model.Command.SireId == s.Id)">@s.Name [@s.TagNumber] (@s.Breed)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-semibold">Мать (Корова)</label>
+                <select name="DamId" class="form-select">
+                    <option value="">— Не указана —</option>
+                    @foreach (var d in Model.PotentialDams)
+                    {
+                        <option value="@d.Id" selected="@(Model.Command.DamId == d.Id)">@d.Name [@d.TagNumber] (@d.Breed)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label small fw-semibold">Производственный корпус *</label>
+                <input type="text" name="BarnName" value="@Model.Command.BarnName" class="form-control" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-semibold">Секция / Стойло *</label>
+                <input type="text" name="SectionCode" value="@Model.Command.SectionCode" class="form-control" required />
+            </div>
+
+            <div class="col-md-12">
+                <label class="form-label small fw-semibold">Генетическая линия</label>
+                <input type="text" name="LineageCode" value="@Model.Command.LineageCode" class="form-control" placeholder="Напр. Вис Бэк Айдиал 1013415" />
+            </div>
+            <div class="col-md-12">
+                <label class="form-label small fw-semibold">Зоотехнические и ветеринарные примечания</label>
+                <textarea name="Notes" rows="2" class="form-control">@Model.Command.Notes</textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="p-3 border-top d-flex justify-content-end gap-2" style="border-color: var(--vg-border) !important;">
+        <button type="button" class="btn btn-outline-secondary" onclick="closeVgModal()">Отмена</button>
+        <button type="submit" class="btn btn-vg-primary">Сохранить карточку</button>
+    </div>
+</form>

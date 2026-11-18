@@ -1,0 +1,145 @@
+@model TemporalAuditViewModel
+@{
+    ViewData["Title"] = "Неизменяемый ветеринарный аудит (SQL Server Temporal Tables)";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">📜 Неизменяемый ветеринарный аудит (<code>SYSTEM_VERSIONING = ON</code>)</h2>
+        <p class="text-muted mb-0">
+            Прямое чтение системно-версионируемых таблиц MS SQL Server (<code>FOR SYSTEM_TIME ALL</code>): история введения сильнодействующих препаратов (<code>TreatmentRecordsHistory</code>) и переходов статусов здоровья (<code>AnimalsHistory</code>)
+        </p>
+    </div>
+
+    <form method="get" class="d-flex align-items-center gap-2">
+        <select name="animalId" class="form-select form-select-sm" style="min-width: 250px;" onchange="this.form.submit()">
+            <option value="">Все животные стада ИрГАУ</option>
+            @foreach (var a in Model.ActiveAnimals)
+            {
+                <option value="@a.Id" selected="@(Model.FilteredAnimalId == a.Id)">@a.Name [@a.TagNumber]</option>
+            }
+        </select>
+        @if (Model.FilteredAnimalId.HasValue)
+        {
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+        }
+    </form>
+</div>
+
+<!-- 1. Системно-версионируемый журнал сильнодействующих ветпрепаратов -->
+<div class="vg-card mb-4">
+    <div class="vg-card-header">
+        <h5 class="fw-bold mb-0">1. Системные версии журнала вет-обработок (<code>dbo.TreatmentRecords FOR SYSTEM_TIME ALL</code>)</h5>
+        <span class="badge bg-dark font-monospace">SYSTEM_VERSIONING = ON</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-3">Тип версии</th>
+                    <th>SysStartTime (UTC)</th>
+                    <th>SysEndTime (UTC)</th>
+                    <th>Животное</th>
+                    <th>Препарат / Серия</th>
+                    <th>Доза</th>
+                    <th>Диагноз / Врач</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.TreatmentHistory)
+                {
+                    <tr style="@(!row.IsCurrentVersion ? "background: var(--vg-warning-soft);" : "")">
+                        <td class="ps-3">
+                            @if (row.IsCurrentVersion)
+                            {
+                                <span class="vg-badge-healthy">Актуальная</span>
+                            }
+                            else
+                            {
+                                <span class="vg-badge-treatment">Архивная ревизия</span>
+                            }
+                        </td>
+                        <td class="font-monospace small">@row.SysStartTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</td>
+                        <td class="font-monospace small">@(row.IsCurrentVersion ? "9999-12-31 23:59:59" : row.SysEndTime.ToString("yyyy-MM-dd HH:mm:ss.fff"))</td>
+                        <td class="small">
+                            <strong>@row.AnimalName</strong> <span class="text-muted font-monospace">[@row.AnimalTag]</span>
+                        </td>
+                        <td class="small">
+                            <strong>@row.DrugNameSnapshot</strong> (@row.DrugBatchSeriesSnapshot)
+                            @if (row.IsPotentDrugSnapshot)
+                            {
+                                <span class="badge bg-danger ms-1">Сильнодейств.</span>
+                            }
+                        </td>
+                        <td class="small">@row.DosageAmount.ToString("0.#") @row.DosageUnit</td>
+                        <td class="small">
+                            @row.Diagnosis
+                            <div class="text-muted">@row.VeterinarianName</div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 2. Системно-версионируемая история смены статусов здоровья и карантина животных -->
+<div class="vg-card">
+    <div class="vg-card-header">
+        <h5 class="fw-bold mb-0">2. История переходов статусов здоровья и изоляции (<code>dbo.Animals FOR SYSTEM_TIME ALL</code>)</h5>
+        <span class="badge bg-dark font-monospace">AnimalsHistory</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-3">Версия строки</th>
+                    <th>SysStartTime (UTC)</th>
+                    <th>SysEndTime (UTC)</th>
+                    <th>Животное / Бирка</th>
+                    <th>Статус здоровья на момент версии</th>
+                    <th>Корпус / Секция</th>
+                    <th class="pe-3">Причина карантина / лечения</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.AnimalStatusHistory)
+                {
+                    <tr style="@(!a.IsCurrentVersion ? "background: var(--vg-surface-alt);" : "")">
+                        <td class="ps-3">
+                            @if (a.IsCurrentVersion)
+                            {
+                                <span class="vg-badge-healthy">Текущее состояние</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Исторический срез</span>
+                            }
+                        </td>
+                        <td class="font-monospace small">@a.SysStartTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</td>
+                        <td class="font-monospace small">@(a.IsCurrentVersion ? "9999-12-31 23:59:59" : a.SysEndTime.ToString("yyyy-MM-dd HH:mm:ss.fff"))</td>
+                        <td class="small">
+                            <strong>@a.Name</strong> <span class="font-monospace text-muted">[@a.TagNumber]</span>
+                        </td>
+                        <td>
+                            @if (a.HealthStatus == HealthStatus.Healthy)
+                            {
+                                <span class="vg-badge-healthy">@a.HealthStatus.ToDisplayName()</span>
+                            }
+                            else if (a.HealthStatus == HealthStatus.Quarantine)
+                            {
+                                <span class="vg-badge-quarantine">@a.HealthStatus.ToDisplayName()</span>
+                            }
+                            else
+                            {
+                                <span class="vg-badge-treatment">@a.HealthStatus.ToDisplayName()</span>
+                            }
+                        </td>
+                        <td class="small">@a.BarnName (@a.SectionCode)</td>
+                        <td class="pe-3 small text-muted">@(a.QuarantineReason ?? "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

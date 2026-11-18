@@ -1,0 +1,58 @@
+@model IReadOnlyList<DemoUserProfile>
+@{
+    ViewData["Title"] = "Демо-вход по ролям";
+    var returnUrl = ViewBag.ReturnUrl as string;
+}
+
+<div class="row justify-content-center py-3">
+    <div class="col-xl-10">
+        <div class="vg-card p-4 p-lg-5 mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom" style="border-color: var(--vg-border) !important;">
+                <div>
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 mb-2">
+                        Учхоз «Молодёжное» • Ветеринарный факультет ИрГАУ
+                    </span>
+                    <h2 class="fw-bold mb-1">Быстрый демо-вход в систему «VetGuard»</h2>
+                    <p class="text-muted mb-0">Выберите рабочее место специалиста для мгновенной авторизации в 1 клик без ввода пароля.</p>
+                </div>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <form asp-action="Logout" method="post">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Выйти из текущей роли</button>
+                    </form>
+                }
+            </div>
+
+            <div class="row g-4">
+                @foreach (var profile in Model)
+                {
+                    var isCurrent = User.IsInRole(profile.Role);
+                    <div class="col-md-4">
+                        <div class="vg-card h-100 p-4 d-flex flex-column justify-content-between @(isCurrent ? "border-success border-2" : "")">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="fs-1">@profile.BadgeIcon</span>
+                                    @if (isCurrent)
+                                    {
+                                        <span class="vg-badge-healthy">Активная сессия</span>
+                                    }
+                                </div>
+                                <h5 class="fw-bold mb-1">@profile.RoleTitle</h5>
+                                <div class="small fw-semibold text-success mb-2">@profile.FullName • @profile.Department</div>
+                                <p class="small text-muted mb-4">@profile.Description</p>
+                            </div>
+
+                            <form asp-action="DemoLogin" method="post">
+                                <input type="hidden" name="roleKey" value="@profile.Key" />
+                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                <button type="submit" class="btn btn-vg-primary w-100 py-2">
+                                    Войти как «@profile.RoleTitle» →
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

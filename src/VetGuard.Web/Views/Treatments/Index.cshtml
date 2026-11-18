@@ -1,0 +1,151 @@
+@model TreatmentsIndexViewModel
+@{
+    ViewData["Title"] = "Журнал лечебно-профилактических обработок";
+}
+
+<div class="mb-4">
+    <h2 class="fw-bold mb-1">💉 Журнал лечебно-профилактических обработок (ЛПМ)</h2>
+    <p class="text-muted mb-0">Регистрация введения антибиотиков и ветпрепаратов автоматически включает «Карантинный замок», списывает серию со склада и пишет неизменяемую запись в SQL Server Temporal Table</p>
+</div>
+
+<div class="row g-4">
+    <!-- Форма введения ветпрепарата -->
+    <div class="col-lg-5">
+        <div class="vg-card p-4">
+            <h5 class="fw-bold mb-3">Назначить и ввести ветпрепарат</h5>
+            <form asp-action="Register" method="post">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Животное (из действующего стада) *</label>
+                    <select name="AnimalId" class="form-select" required>
+                        @foreach (var a in Model.ActiveAnimals)
+                        {
+                            <option value="@a.Id" selected="@(Model.PreselectedAnimalId == a.Id)">
+                                @a.Name [@a.TagNumber] — @a.Breed (@a.BarnName)
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Ветпрепарат / Антибиотик *</label>
+                    <select name="VetDrugId"
+                            class="form-select"
+                            hx-get="@Url.Action("WithdrawalPreview", "Treatments")"
+                            hx-target="#withdrawal-preview-box"
+                            hx-trigger="change"
+                            required>
+                        @foreach (var d in Model.AvailableDrugs)
+                        {
+                            <option value="@d.Id">
+                                @d.Name (мол.: @d.MilkWithdrawalHours ч / мясо: @d.MeatWithdrawalDays сут | остаток: @d.StockDoses.ToString("0") @d.Unit)
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Живой HTMX-расчет даты полного выведения до отправки формы -->
+                <div id="withdrawal-preview-box" class="mb-3">
+                    @if (Model.InitialDrugPreview is not null)
+                    {
+                        @await Html.PartialAsync("_WithdrawalPreview", Model.InitialDrugPreview)
+                    }
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Дозировка *</label>
+                        <input type="number" step="0.1" name="DosageAmount" value="25" class="form-control" required />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Путь введения *</label>
+                        <select name="AdministrationRoute" class="form-select">
+                            <option value="внутримышечно">Внутримышечно (в/м)</option>
+                            <option value="подкожно">Подкожно (п/к)</option>
+                            <option value="интрацистернально">Интрацистернально</option>
+                            <option value="внутривенно">Внутривенно (в/в)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Клинический диагноз / Показание *</label>
+                    <input type="text" name="Diagnosis" class="form-control" required placeholder="Напр. Острый субклинический мастит левой доли" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Клинические примечания</label>
+                    <textarea name="ClinicalNotes" rows="2" class="form-control" placeholder="Режим доения в отдельный санитарный бачок..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-danger w-100 py-2 fw-bold">
+                    💉 Зарегистрировать введение и включить Карантинный замок
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Журнал зарегистрированных введений -->
+    <div class="col-lg-7">
+        <div class="vg-card">
+            <div class="vg-card-header">
+                <h5 class="fw-bold mb-0">Записи государственного ветеринарного журнала ЛПМ</h5>
+                <a asp-controller="Audit" asp-action="Index" class="btn btn-sm btn-outline-secondary">📜 SQL Temporal History</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Дата введения</th>
+                            <th>Животное</th>
+                            <th>Препарат / Доза</th>
+                            <th>Диагноз</th>
+                            <th class="pe-3">Статус карантина</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tr in Model.RecentTreatments)
+                        {
+                            var now = DateTime.UtcNow;
+                            var milkActive = tr.IsMilkWithdrawalActive(now);
+                            var meatActive = tr.IsMeatWithdrawalActive(now);
+                            <tr>
+                                <td class="ps-3 small">
+                                    <div class="fw-semibold">@tr.AdministeredAtUtc.AddHours(8).ToString("dd.MM.yyyy HH:mm")</div>
+                                    <div class="text-muted">@tr.VeterinarianName</div>
+                                </td>
+                                <td>
+                                    <a asp-controller="Animals" asp-action="Details" asp-route-id="@tr.AnimalId" class="fw-bold text-decoration-none">
+                                        @(tr.Animal?.Name ?? "—")
+                                    </a>
+                                    <div class="small text-muted font-monospace">@(tr.Animal?.TagNumber)</div>
+                                </td>
+                                <td class="small">
+                                    <div class="fw-semibold">@tr.DrugNameSnapshot</div>
+                                    <div class="text-muted">@tr.DosageAmount.ToString("0.#") @tr.DosageUnit (@tr.AdministrationRoute) • С: @tr.DrugBatchSeriesSnapshot</div>
+                                </td>
+                                <td class="small">@tr.Diagnosis</td>
+                                <td class="pe-3">
+                                    @if (milkActive)
+                                    {
+                                        <div class="vg-timer-pill mb-1">
+                                            🔒 <span data-countdown-utc="@tr.MilkWithdrawalEndsAtUtc.ToString("O")">активен</span>
+                                        </div>
+                                        <div class="small text-danger">Молоко до @tr.MilkWithdrawalEndsAtUtc.AddHours(8).ToString("dd.MM HH:mm")</div>
+                                    }
+                                    else if (meatActive)
+                                    {
+                                        <span class="vg-badge-treatment">Мясо до @tr.MeatWithdrawalEndsAtUtc.ToString("dd.MM.yy")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="vg-badge-healthy">Выведен полностью</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,66 @@
+@model GroupEpizooticModalViewModel
+
+<form asp-controller="Epizootics" asp-action="ExecuteGroupAct" method="post">
+    <div class="vg-card-header">
+        <div>
+            <span class="badge bg-success mb-1">Групповая вет-обработка в 2 клика</span>
+            <h5 class="fw-bold mb-0">@Model.Plan.Title</h5>
+        </div>
+        <button type="button" class="btn-close" onclick="closeVgModal()"></button>
+    </div>
+
+    <div class="p-4">
+        <input type="hidden" name="RuleId" value="@Model.Plan.RuleId" />
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-8">
+                <label class="form-label small fw-semibold">Биопрепарат / Диагностикум со склада (списание по серии с <code>rowversion</code>) *</label>
+                <select name="VetDrugId" class="form-select" required>
+                    @foreach (var b in Model.Biologics)
+                    {
+                        <option value="@b.Id" selected="@(b.Id == Model.Plan.DefaultDrugId)">
+                            @b.Name — серия @b.BatchSeries (доступно: @b.StockDoses.ToString("0.#") @b.Unit)
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Доза на 1 гол. *</label>
+                <input type="number" step="0.1" name="DosePerAnimal" value="@Model.Plan.StandardDosePerAnimal.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)" class="form-control" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-semibold">Подразделение / Корпус в акте</label>
+                <input type="text" name="TargetBarn" value="Учебный корпус №1 и молодняк ИрГАУ" class="form-control" required />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small fw-semibold">Член комиссии (зоотехник)</label>
+                <input type="text" name="WitnessZootechnician" value="Ильина Е.С. (Зоотехник-селекционер)" class="form-control" required />
+            </div>
+        </div>
+
+        <label class="form-label small fw-bold">Отмеченное поголовье к обработке (@Model.Plan.ActionRequiredAnimals.Count гол.):</label>
+        <div class="border rounded-3 p-2 mb-3" style="max-height: 220px; overflow-y: auto; border-color: var(--vg-border) !important;">
+            @foreach (var a in Model.Plan.ActionRequiredAnimals)
+            {
+                <div class="form-check py-1 border-bottom" style="border-color: var(--vg-border) !important;">
+                    <input class="form-check-input" type="checkbox" name="AnimalIds" value="@a.AnimalId" id="ep_@a.AnimalId" checked />
+                    <label class="form-check-label small" for="ep_@a.AnimalId">
+                        <strong>@a.Name</strong> <span class="font-monospace text-muted">[@a.TagNumber]</span> — @a.Breed (@a.BarnName, возраст @(a.AgeDays / 30) мес.)
+                    </label>
+                </div>
+            }
+        </div>
+
+        <div class="mb-2">
+            <label class="form-label small fw-semibold">Заключение комиссии для PDF-акта</label>
+            <input type="text" name="Notes" value="Клинический осмотр и термометрия перед обработкой проведены, противопоказаний нет." class="form-control" />
+        </div>
+    </div>
+
+    <div class="p-3 border-top d-flex justify-content-end gap-2" style="border-color: var(--vg-border) !important;">
+        <button type="button" class="btn btn-outline-secondary" onclick="closeVgModal()">Отмена</button>
+        <button type="submit" class="btn btn-vg-primary fw-bold">
+            ✓ Подтвердить групповую обработку и сформировать Акт
+        </button>
+    </div>
+</form>

@@ -1,0 +1,122 @@
+@model AnimalDetailsDto
+@{
+    var a = Model.Animal;
+    ViewData["Title"] = $"QR-Осмотр у стойла: {a.Name}";
+    var isLocked = Model.ActiveMilkLock is not null || Model.ActiveMeatLock is not null || a.HealthStatus == HealthStatus.Quarantine;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="badge bg-dark">📱 МОБИЛЬНЫЙ ТЕРМИНАЛ ВЕТВРАЧА (QR-СКАН)</span>
+            <a asp-controller="Animals" asp-action="Details" asp-route-id="@a.Id" class="small text-decoration-none">Полная карточка →</a>
+        </div>
+
+        <!-- Светофор карантинного статуса -->
+        @if (isLocked)
+        {
+            <div class="p-4 rounded-4 mb-3 text-white shadow" style="background: linear-gradient(135deg, #b91c1c, #dc2626);">
+                <div class="fs-4 fw-bold mb-1">⛔ СТОП! КАРАНТИННЫЙ ЗАМОК</div>
+                <div class="fw-semibold">@a.Name • Бирка: @a.TagNumber</div>
+                <hr class="border-light opacity-25 my-2" />
+                @if (Model.ActiveMilkLock is not null)
+                {
+                    <div class="small">
+                        Препарат: <strong>@Model.ActiveMilkLock.DrugNameSnapshot</strong> (серия @Model.ActiveMilkLock.DrugBatchSeriesSnapshot)<br />
+                        Сдача молока ЗАПРЕЩЕНА до: <strong>@Model.ActiveMilkLock.MilkWithdrawalEndsAtUtc.AddHours(8).ToString("dd.MM.yyyy HH:mm") (ИКТ)</strong>
+                    </div>
+                    <div class="mt-2 badge bg-white text-danger fs-6 px-3 py-2 font-monospace">
+                        Осталось: <span data-countdown-utc="@Model.ActiveMilkLock.MilkWithdrawalEndsAtUtc.ToString("O")">...</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="small">Причина изоляции: <strong>@(a.QuarantineReason ?? "Карантинный изолятор")</strong></div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="p-4 rounded-4 mb-3 text-white shadow" style="background: linear-gradient(135deg, #0f5c43, #15803d);">
+                <div class="fs-4 fw-bold mb-1">🟢 ДОПУСК ОТКРЫТ — ЗДОРОВА</div>
+                <div class="fw-semibold">@a.Name • Бирка: @a.TagNumber</div>
+                <div class="small opacity-90 mt-1">Активных периодов выведения антибиотиков нет. Молоко и продукция разрешены к приемке.</div>
+            </div>
+        }
+
+        <!-- Паспортная сводка у стойла -->
+        <div class="vg-card p-3 mb-3 small">
+            <div class="row g-2">
+                <div class="col-6"><strong>Порода:</strong> @a.Breed</div>
+                <div class="col-6"><strong>Возраст:</strong> @a.GetFormattedAge(DateTime.UtcNow)</div>
+                <div class="col-6"><strong>Корпус:</strong> @a.BarnName</div>
+                <div class="col-6"><strong>Стойло:</strong> @a.SectionCode</div>
+                <div class="col-6"><strong>Масса:</strong> @a.CurrentWeightKg.ToString("0") кг</div>
+                <div class="col-6"><strong>RFID:</strong> @(a.RfidChip ?? "—")</div>
+            </div>
+        </div>
+
+        <!-- Быстрая форма клинического осмотра ветврача -->
+        <div class="vg-card p-4">
+            <h5 class="fw-bold mb-3">🩺 Экспресс-осмотр у стойла</h5>
+            <form asp-action="Inspect" method="post">
+                <input type="hidden" name="AnimalId" value="@a.Id" />
+                <input type="hidden" name="tagNumber" value="@a.TagNumber" />
+
+                <div class="row g-3">
+                    <div class="col-4">
+                        <label class="form-label small fw-semibold">Темп. (°C) *</label>
+                        <input type="number" step="0.1" name="BodyTemperatureC" value="38.6" class="form-control" required />
+                        <small class="text-muted" style="font-size:0.7rem;">Норма: 37.5–39.5</small>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small fw-semibold">Пульс (уд/м)</label>
+                        <input type="number" name="HeartRateBpm" value="72" class="form-control" required />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small fw-semibold">Руминация/2м</label>
+                        <input type="number" name="RuminationPer2Min" value="3" class="form-control" required />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold">Состояние вымени / слизистых</label>
+                        <input type="text" name="UdderCondition" value="Мягкое, безболезненное, секрет без хлопьев" class="form-control" />
+                        <input type="hidden" name="MucousMembranes" value="Бледно-розовые, влажные" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold">Итоговый статус здоровья</label>
+                        <select name="NewHealthStatus" class="form-select">
+                            <option value="@HealthStatus.Healthy" selected="@(a.HealthStatus == HealthStatus.Healthy)">Клинически здоров</option>
+                            <option value="@HealthStatus.Observation" selected="@(a.HealthStatus == HealthStatus.Observation)">Клиническое наблюдение</option>
+                            <option value="@HealthStatus.UnderTreatment" selected="@(a.HealthStatus == HealthStatus.UnderTreatment)">На вет-лечении</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="MoveToQuarantineIsolator" value="true" id="mobIsolateSwitch" />
+                            <label class="form-check-label small fw-bold text-danger" for="mobIsolateSwitch">
+                                🚨 Экстренно перевести в Карантинный изолятор!
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label small fw-semibold">Клиническое заключение ветврача *</label>
+                        <textarea name="Summary" rows="2" class="form-control" required placeholder="Аппетит сохранен, жвачка активная, патологий не выявлено..."></textarea>
+                    </div>
+
+                    <div class="col-12 d-grid gap-2">
+                        <button type="submit" class="btn btn-vg-primary py-2">
+                            ✓ Сохранить осмотр в историю болезни
+                        </button>
+                        <a asp-controller="Treatments" asp-action="Index" asp-route-animalId="@a.Id" class="btn btn-outline-danger">
+                            💉 Перейти к введению препарата (ЛПМ)
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

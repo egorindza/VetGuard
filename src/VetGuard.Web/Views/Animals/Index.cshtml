@@ -1,0 +1,79 @@
+@model AnimalsIndexViewModel
+@{
+    ViewData["Title"] = "Реестр поголовья и QR-паспорта";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">🐄 Реестр племенного и товарного поголовья</h2>
+        <p class="text-muted mb-0">Учетные карточки КРС, радиочастотные RFID-транспондеры, печать стойловых QR-паспортов и статус выведения ветпрепаратов</p>
+    </div>
+    <div>
+        <button type="button"
+                class="btn btn-vg-primary"
+                hx-get="@Url.Action("CreateModal", "Animals")"
+                hx-target="#vg-modal-content"
+                hx-swap="innerHTML">
+            + Зарегистрировать животное
+        </button>
+    </div>
+</div>
+
+<!-- Живая панель фильтрации на HTMX -->
+<div class="vg-card p-3 mb-4">
+    <form id="animals-filter-form"
+          hx-get="@Url.Action("Table", "Animals")"
+          hx-target="#animals-table-container"
+          hx-trigger="keyup changed delay:250ms from:#search-input, change">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold mb-1">Поиск (Бирка / RFID / Кличка / Линия)</label>
+                <input type="text" id="search-input" name="Search" value="@Model.Filter.Search"
+                       class="form-control form-control-sm" placeholder="Напр. RU-38-IRGAU-0107 или Зорька..." />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold mb-1">Порода</label>
+                <select name="Breed" class="form-select form-select-sm">
+                    <option value="">Все породы</option>
+                    @foreach (var b in Model.AvailableBreeds)
+                    {
+                        <option value="@b" selected="@(Model.Filter.Breed == b)">@b</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-semibold mb-1">Пол</label>
+                <select name="Sex" class="form-select form-select-sm">
+                    <option value="">Любой</option>
+                    <option value="@AnimalSex.Female" selected="@(Model.Filter.Sex == AnimalSex.Female)">♀ Коровы / Тёлки</option>
+                    <option value="@AnimalSex.Male" selected="@(Model.Filter.Sex == AnimalSex.Male)">♂ Быки-производители</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold mb-1">Корпус / Подразделение</label>
+                <select name="BarnName" class="form-select form-select-sm">
+                    <option value="">Все корпуса учхоза</option>
+                    @foreach (var barn in Model.AvailableBarns)
+                    {
+                        <option value="@barn" selected="@(Model.Filter.BarnName == barn)">@barn</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <div class="form-check form-switch pt-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="onlyLockedSwitch"
+                           name="OnlyQuarantineLocked" value="true" checked="@Model.Filter.OnlyQuarantineLocked" />
+                    <label class="form-check-label small fw-semibold text-danger" for="onlyLockedSwitch">
+                        Только под замком 🔒
+                    </label>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="vg-card">
+    <div id="animals-table-container">
+        @await Html.PartialAsync("_AnimalsTable", Model.Animals)
+    </div>
+</div>

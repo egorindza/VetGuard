@@ -1,0 +1,18 @@
+@model WithdrawalPreviewDto
+
+<div class="p-3 rounded-3 border @(Model.MilkWithdrawalHours > 0 ? "border-danger" : "border-success")"
+     style="background: @(Model.MilkWithdrawalHours > 0 ? "var(--vg-danger-soft)" : "var(--vg-success-soft)");">
+    <div class="small fw-bold mb-1">
+        @(Model.MilkWithdrawalHours > 0
+            ? $"🔒 АВТОМАТИЧЕСКИЙ РАСЧЕТ КАРАНТИННОГО ЗАМКА ({Model.DrugName})"
+            : $"🟢 Препарат без браковки молока ({Model.DrugName})")
+    </div>
+    <div class="small">
+        • Действующее в-во: <strong>@Model.ActiveSubstance</strong> (серия <code>@Model.BatchSeries</code>, на складе: <strong>@Model.AvailableStock.ToString("0.#") @Model.Unit</strong>)<br />
+        • Рекомендуемая схема: @Model.DefaultDosageText<br />
+        • Выведение по <strong>молоку (@Model.MilkWithdrawalHours ч)</strong>:
+        <strong>@(Model.MilkWithdrawalHours > 0 ? Model.MilkClearanceUtc.AddHours(8).ToString("dd.MM.yyyy HH:mm") + " (ИКТ)" : "Не требуется")</strong><br />
+        • Выведение по <strong>мясу (@Model.MeatWithdrawalDays сут)</strong>:
+        <strong>@(Model.MeatWithdrawalDays > 0 ? Model.MeatClearanceUtc.AddHours(8).ToString("dd.MM.yyyy HH:mm") + " (ИКТ)" : "Не требуется")</strong>
+    </div>
+</div>

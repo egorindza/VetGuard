@@ -1,19 +1,23 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using VetGuard.Application.Interfaces;
 using VetGuard.Web.Models;
 
 namespace VetGuard.Web.Controllers;
 
 public class HomeController : Controller
 {
-    public IActionResult Index()
+    private readonly IHerdService _herdService;
+
+    public HomeController(IHerdService herdService)
     {
-        return View();
+        _herdService = herdService;
     }
 
-    public IActionResult Privacy()
+    public async Task<IActionResult> Index(CancellationToken ct)
     {
-        return View();
+        var summary = await _herdService.GetDashboardSummaryAsync(ct);
+        return View(summary);
     }
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

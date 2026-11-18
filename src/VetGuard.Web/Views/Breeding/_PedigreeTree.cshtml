@@ -1,0 +1,70 @@
+@model PedigreeTreeViewDto
+@{
+    var romanLabels = new Dictionary<int, string>
+    {
+        [1] = "I ряд — Родители",
+        [2] = "II ряд — Деды и бабки",
+        [3] = "III ряд — Прадеды",
+        [4] = "IV ряд — Прапрадеды",
+        [5] = "V колено",
+        [6] = "VI колено (Основатели)"
+    };
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <span class="fw-bold fs-6">Пробанд: @Model.Subject.Name [@Model.Subject.TagNumber]</span>
+        <span class="text-muted small ms-2">(@Model.Subject.Breed • Линия: @(Model.Subject.LineageCode ?? "—") • Найдено предков в CTE: <strong>@Model.Nodes.Count</strong>)</span>
+    </div>
+    @if (Model.RepeatedAncestorNames.Count > 0)
+    {
+        <div class="badge bg-warning text-dark px-3 py-2">
+            ⚠️ Повторяющиеся предки в родословной: @string.Join(", ", Model.RepeatedAncestorNames)
+        </div>
+    }
+    else
+    {
+        <span class="vg-badge-healthy">✓ Аутбредное происхождение (повторов предков в родословной нет)</span>
+    }
+</div>
+
+@if (Model.Nodes.Count == 0)
+{
+    <div class="text-center py-4 text-muted">Для выбранного животного предки в племенной книге не указаны.</div>
+}
+else
+{
+    <div class="pedigree-grid">
+        @for (var gen = 1; gen <= 6; gen++)
+        {
+            var genNodes = Model.Nodes.Where(n => n.GenerationDepth == gen).OrderBy(n => n.PathCode).ToList();
+            <div class="pedigree-col">
+                <div class="pedigree-col-header">@romanLabels[gen]</div>
+                @if (genNodes.Count == 0)
+                {
+                    <div class="text-center small text-muted py-3 border rounded border-dashed">— нет данных —</div>
+                }
+                else
+                {
+                    @foreach (var node in genNodes)
+                    {
+                        var sexCss = node.Sex == AnimalSex.Male ? "sire-node" : "dam-node";
+                        var repCss = node.OccurrenceCount > 1 ? "repeated-ancestor" : "";
+                        <div class="pedigree-node @sexCss @repCss">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold">@(node.Sex == AnimalSex.Male ? "♂" : "♀") @node.Name</span>
+                                <span class="badge bg-secondary bg-opacity-10 text-body font-monospace" style="font-size:0.68rem;">@node.PathCode</span>
+                            </div>
+                            <div class="font-monospace text-muted" style="font-size:0.73rem;">@node.TagNumber • @node.BirthDate.Year г.</div>
+                            <div class="text-muted" style="font-size:0.73rem;">@node.Breed</div>
+                            @if (node.OccurrenceCount > 1)
+                            {
+                                <div class="fw-bold text-warning mt-1" style="font-size:0.72rem;">Инбредный повтор (@(node.OccurrenceCount)x)</div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        }
+    </div>
+}

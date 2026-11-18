@@ -1,0 +1,426 @@
+@model AnimalDetailsDto
+@{
+    var a = Model.Animal;
+    ViewData["Title"] = $"{a.Name} [{a.TagNumber}] — Ветеринарный QR-паспорт";
+    var hasMilkLock = Model.ActiveMilkLock is not null;
+    var hasMeatLock = Model.ActiveMeatLock is not null;
+    var isQuarantined = a.HealthStatus == HealthStatus.Quarantine;
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <a asp-action="Index" class="small text-decoration-none text-muted">← Вернуться в реестр поголовья</a>
+        <h2 class="fw-bold mb-0 mt-1">
+            @a.Name <span class="font-monospace fs-5 text-muted">[@a.TagNumber]</span>
+        </h2>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <button type="button"
+                class="btn btn-outline-secondary btn-sm"
+                hx-get="@Url.Action("EditModal", "Animals", new { id = a.Id })"
+                hx-target="#vg-modal-content"
+                hx-swap="innerHTML">
+            ✏️ Редактировать
+        </button>
+        <a asp-controller="Treatments" asp-action="Index" asp-route-animalId="@a.Id" class="btn btn-danger btn-sm fw-semibold">
+            💉 Назначить ветпрепарат
+        </a>
+        <a asp-controller="Breeding" asp-action="Index" asp-route-subjectId="@a.Id" asp-route-damId="@(a.Sex == AnimalSex.Female ? a.Id : null)" class="btn btn-outline-primary btn-sm">
+            🧬 Родословная (6 колен)
+        </a>
+        <a asp-action="StallCardPdf" asp-route-id="@a.Id" class="btn btn-vg-primary btn-sm">
+            🖨️ Стойловая QR-карточка (PDF)
+        </a>
+        <a asp-action="VetExtractPdf" asp-route-id="@a.Id" class="btn btn-outline-success btn-sm">
+            📄 Вет-выписка (PDF)
+        </a>
+    </div>
+</div>
+
+<!-- Баннер активного Карантинного замка -->
+@if (hasMilkLock || hasMeatLock || isQuarantined)
+{
+    <div class="vg-quarantine-lock-box mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <div class="fw-bold text-danger fs-5 d-flex align-items-center gap-2">
+                    <span class="vg-pulse-dot"></span>
+                    🔒 ВНИМАНИЕ: АКТИВЕН ЖЕСТКИЙ КАРАНТИННЫЙ ЗАМОК ПРОДУКЦИИ!
+                </div>
+                @if (hasMilkLock)
+                {
+                    <div class="mt-1">
+                        Введен сильнодействующий препарат: <strong>«@Model.ActiveMilkLock!.DrugNameSnapshot»</strong>
+                        (серия <code>@Model.ActiveMilkLock.DrugBatchSeriesSnapshot</code>, диагноз: @Model.ActiveMilkLock.Diagnosis).<br />
+                        Сдача молока в товарный танк <strong>программно заблокирована</strong> до
+                        <strong>@Model.ActiveMilkLock.MilkWithdrawalEndsAtUtc.AddHours(8).ToString("dd.MM.yyyy HH:mm") (ИКТ)</strong>!
+                    </div>
+                }
+                else if (isQuarantined)
+                {
+                    <div class="mt-1">
+                        Животное изолировано в боксе карантинного изолятора: <strong>@a.QuarantineReason</strong>. Любая реализация сырья запрещена.
+                    </div>
+                }
+            </div>
+            @if (hasMilkLock)
+            {
+                <div class="text-end">
+                    <div class="small text-muted mb-1">Обратный отсчет выведения:</div>
+                    <span class="vg-timer-pill fs-6 px-3 py-2">
+                        ⏱️ <span data-countdown-utc="@Model.ActiveMilkLock!.MilkWithdrawalEndsAtUtc.ToString("O")">расчет...</span>
+                    </span>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="row g-4 mb-4">
+    <!-- Левая колонка: Паспортные данные -->
+    <div class="col-lg-8">
+        <div class="vg-card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <h5 class="fw-bold mb-0">Паспортные и зоотехнические сведения</h5>
+                @if (a.HealthStatus == HealthStatus.Healthy)
+                {
+                    <span class="vg-badge-healthy">@a.HealthStatus.ToDisplayName()</span>
+                }
+                else if (a.HealthStatus == HealthStatus.Quarantine)
+                {
+                    <span class="vg-badge-quarantine">@a.HealthStatus.ToDisplayName()</span>
+                }
+                else
+                {
+                    <span class="vg-badge-treatment">@a.HealthStatus.ToDisplayName()</span>
+                }
+            </div>
+
+            <div class="row g-3 small">
+                <div class="col-sm-6 col-md-4">
+                    <div class="text-muted">Инвентарный номер бирки</div>
+                    <div class="fw-bold font-monospace fs-6">@a.TagNumber</div>
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <div class="text-muted">RFID-чип (ISO 11784)</div>
+                    <div class="fw-bold font-monospace">@(a.RfidChip ?? "Не чипировано")</div>
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <div class="text-muted">Вид и порода</div>
+                    <div class="fw-bold">@a.Breed (@a.Species.ToDisplayName())</div>
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <div class="text-muted">Пол и возраст</div>
+                    <div class="fw-bold">@a.Sex.ToShortSex() • @a.GetFormattedAge(DateTime.UtcNow)</div>
+                    <div class="text-muted">Рожд.: @a.BirthDate.ToString("dd.MM.yyyy")</div>
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <div class="text-muted">Корпус / Стойло</div>
+                    <div class="fw-bold">@a.BarnName</div>
+                    <div class="text-muted">@a.SectionCode</div>
+                </div>
+                <div class="col-sm-6 col-md-4">
+                    <div class="text-muted">Масса / Средний удой</div>
+                    <div class="fw-bold">@a.CurrentWeightKg.ToString("0.0") кг @(a.AverageDailyMilkKg.HasValue ? $"• {a.AverageDailyMilkKg.Value:0.0} л/сут" : "")</div>
+                    <div class="text-muted">Линия: @(a.LineageCode ?? "—")</div>
+                </div>
+
+                <div class="col-md-6 pt-2 border-top" style="border-color: var(--vg-border) !important;">
+                    <div class="text-muted">Отец (Sire ♂)</div>
+                    @if (a.Sire is not null)
+                    {
+                        <div class="fw-semibold">@a.Sire.Name <span class="text-muted font-monospace">[@a.Sire.TagNumber]</span></div>
+                    }
+                    else
+                    {
+                        <div class="text-muted">Не указан</div>
+                    }
+                </div>
+                <div class="col-md-6 pt-2 border-top" style="border-color: var(--vg-border) !important;">
+                    <div class="text-muted">Мать (Dam ♀)</div>
+                    @if (a.Dam is not null)
+                    {
+                        <div class="fw-semibold">@a.Dam.Name <span class="text-muted font-monospace">[@a.Dam.TagNumber]</span></div>
+                    }
+                    else
+                    {
+                        <div class="text-muted">Не указана</div>
+                    }
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(a.Notes))
+            {
+                <div class="mt-3 p-2 rounded small" style="background: var(--vg-surface-alt);">
+                    <strong>Примечание селекционера/ветврача:</strong> @a.Notes
+                </div>
+            }
+
+            <!-- Управление переводом в карантинный изолятор / выпуском -->
+            <div class="mt-3 pt-3 border-top d-flex flex-wrap justify-content-between align-items-center gap-2" style="border-color: var(--vg-border) !important;">
+                @if (a.HealthStatus == HealthStatus.Quarantine)
+                {
+                    <div class="small text-danger fw-semibold">Изолирована с @(a.QuarantineEnteredAtUtc?.AddHours(8).ToString("dd.MM.yyyy") ?? "—")</div>
+                    <form asp-action="Release" method="post">
+                        <input type="hidden" name="animalId" value="@a.Id" />
+                        <button type="submit" class="btn btn-sm btn-success fw-semibold">✓ Завершить карантин и вернуть в корпус</button>
+                    </form>
+                }
+                else
+                {
+                    <form asp-action="Isolate" method="post" class="d-flex flex-wrap gap-2 w-100 align-items-center">
+                        <input type="hidden" name="animalId" value="@a.Id" />
+                        <input type="hidden" name="isolatorBox" value="Бокс №1 (Строгая изоляция)" />
+                        <input type="text" name="reason" class="form-control form-control-sm flex-grow-1" placeholder="Причина перевода в карантинный изолятор (подозрение на инфекцию)..." required />
+                        <button type="submit" class="btn btn-sm btn-outline-danger">🚨 В карантинный изолятор</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Правая колонка: Стойловый QR-паспорт -->
+    <div class="col-lg-4">
+        <div class="vg-card p-4 h-100 text-center d-flex flex-column justify-content-between">
+            <div>
+                <h6 class="fw-bold text-uppercase small text-muted mb-2">Ветеринарный QR-паспорт стойла</h6>
+                <div class="qr-svg-wrapper d-flex justify-content-center my-2">
+                    @Html.Raw(Model.QrCodeSvg)
+                </div>
+                <div class="small font-monospace text-muted mb-2">@Model.PassportUrl</div>
+                <p class="small text-muted mb-3">Наведите камеру смартфона ветврача на стойловой табличке для мгновенного клинического осмотра и проверки карантинного замка.</p>
+            </div>
+            <div class="d-grid gap-2">
+                <a asp-route="passport" asp-route-tagNumber="@a.TagNumber" class="btn btn-vg-primary btn-sm">
+                    📱 Открыть мобильный экран осмотра ветврача
+                </a>
+                <a asp-action="StallCardPdf" asp-route-id="@a.Id" class="btn btn-outline-secondary btn-sm">
+                    🖨️ Скачать стойловую карточку (PDF)
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ГРАФИКИ УДОЕВ И ПРИВЕСОВ + ФОРМЫ УЧЕТА -->
+<div class="row g-4 mb-4">
+    @if (a.Sex == AnimalSex.Female)
+    {
+        var yields = Model.MilkYields.TakeLast(12).ToList();
+        var maxMilk = yields.Count > 0 ? Math.Max(40m, yields.Max(y => y.TotalLiters) + 4m) : 40m;
+        <div class="col-lg-6">
+            <div class="vg-card p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0">🥛 График суточных удоев (л/сут)</h6>
+                    <span class="small text-muted">Красный столбец = сепарировано (карантин)</span>
+                </div>
+
+                @if (yields.Count == 0)
+                {
+                    <div class="text-muted small py-4 text-center">Контрольные дойки еще не внесены (молодняк / тёлка).</div>
+                }
+                else
+                {
+                    <svg viewBox="0 0 520 185" class="w-100 mb-3" role="img" aria-label="График удоев">
+                        <line x1="35" y1="150" x2="505" y2="150" stroke="currentColor" stroke-opacity="0.2" />
+                        <line x1="35" y1="20" x2="505" y2="20" stroke="currentColor" stroke-opacity="0.1" stroke-dasharray="4" />
+                        @{
+                            var count = yields.Count;
+                            var slotWidth = 460.0 / Math.Max(1, count);
+                            for (var i = 0; i < count; i++)
+                            {
+                                var y = yields[i];
+                                var barH = (double)(y.TotalLiters / maxMilk) * 125.0;
+                                var x = 42.0 + i * slotWidth;
+                                var topY = 150.0 - barH;
+                                var fill = y.IsQuarantineDiscarded ? "#dc2626" : "#10b981";
+                                <g>
+                                    <rect x="@x.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                                          y="@topY.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                                          width="@Math.Max(14.0, slotWidth - 10).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                                          height="@barH.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                                          rx="4" fill="@fill" />
+                                    <text x="@((x + (slotWidth - 10) / 2).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))"
+                                          y="@((topY - 4).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))"
+                                          text-anchor="middle" font-size="9.5" fill="currentColor">@y.TotalLiters.ToString("0.0")</text>
+                                    <text x="@((x + (slotWidth - 10) / 2).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))"
+                                          y="167" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">@y.MilkingDate.ToString("dd.MM")</text>
+                                </g>
+                            }
+                        }
+                    </svg>
+                }
+
+                <form asp-action="LogMilk" method="post" class="row g-2 pt-2 border-top" style="border-color: var(--vg-border) !important;">
+                    <input type="hidden" name="AnimalId" value="@a.Id" />
+                    <div class="col-4">
+                        <label class="small text-muted">Дата дойки</label>
+                        <input type="date" name="MilkingDate" value="@DateTime.UtcNow.ToString("yyyy-MM-dd")" class="form-control form-control-sm" required />
+                    </div>
+                    <div class="col-3">
+                        <label class="small text-muted">Утро (л)</label>
+                        <input type="number" step="0.1" name="MorningLiters" value="15.5" class="form-control form-control-sm" required />
+                    </div>
+                    <div class="col-3">
+                        <label class="small text-muted">Вечер (л)</label>
+                        <input type="number" step="0.1" name="EveningLiters" value="14.2" class="form-control form-control-sm" required />
+                    </div>
+                    <div class="col-2 d-grid align-items-end">
+                        <button type="submit" class="btn btn-sm btn-vg-primary">+ Удой</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+
+    @{
+        var weights = Model.WeightRecords.TakeLast(8).ToList();
+        var minW = weights.Count > 0 ? Math.Max(0m, weights.Min(w => w.WeightKg) - 30m) : 0m;
+        var maxW = weights.Count > 0 ? weights.Max(w => w.WeightKg) + 30m : 700m;
+        var spanW = Math.Max(20m, maxW - minW);
+    }
+    <div class="@(a.Sex == AnimalSex.Female ? "col-lg-6" : "col-lg-12")">
+        <div class="vg-card p-4 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold mb-0">⚖️ Динамика живой массы и привесов (кг)</h6>
+                <span class="small text-muted">Текущая масса: <strong>@a.CurrentWeightKg.ToString("0.0") кг</strong></span>
+            </div>
+
+            @if (weights.Count > 0)
+            {
+                var pts = new List<string>();
+                var wCount = weights.Count;
+                for (var i = 0; i < wCount; i++)
+                {
+                    var x = wCount == 1 ? 260.0 : 45.0 + i * (430.0 / (wCount - 1));
+                    var y = 145.0 - (double)((weights[i].WeightKg - minW) / spanW) * 115.0;
+                    pts.Add($"{x.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)},{y.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}");
+                }
+                <svg viewBox="0 0 520 185" class="w-100 mb-3" role="img" aria-label="График живой массы">
+                    <line x1="35" y1="150" x2="505" y2="150" stroke="currentColor" stroke-opacity="0.2" />
+                    <polyline fill="none" stroke="#0284c7" stroke-width="3" points="@string.Join(" ", pts)" />
+                    @for (var i = 0; i < wCount; i++)
+                    {
+                        var x = wCount == 1 ? 260.0 : 45.0 + i * (430.0 / (wCount - 1));
+                        var y = 145.0 - (double)((weights[i].WeightKg - minW) / spanW) * 115.0;
+                        <g>
+                            <circle cx="@x.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                                    cy="@y.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                                    r="5" fill="#0284c7" />
+                            <text x="@x.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                                  y="@((y - 9).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))"
+                                  text-anchor="middle" font-size="10" font-weight="bold" fill="currentColor">@weights[i].WeightKg.ToString("0")</text>
+                            <text x="@x.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
+                                  y="167" text-anchor="middle" font-size="9" fill="currentColor" opacity="0.7">@weights[i].MeasuredAtUtc.ToString("MM.yy")</text>
+                        </g>
+                    }
+                </svg>
+            }
+
+            <form asp-action="LogWeight" method="post" class="row g-2 pt-2 border-top" style="border-color: var(--vg-border) !important;">
+                <input type="hidden" name="AnimalId" value="@a.Id" />
+                <div class="col-5">
+                    <label class="small text-muted">Дата взвешивания</label>
+                    <input type="date" name="MeasuredAtUtc" value="@DateTime.UtcNow.ToString("yyyy-MM-dd")" class="form-control form-control-sm" required />
+                </div>
+                <div class="col-4">
+                    <label class="small text-muted">Масса (кг)</label>
+                    <input type="number" step="0.1" name="WeightKg" value="@((a.CurrentWeightKg + 6m).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))" class="form-control form-control-sm" required />
+                </div>
+                <div class="col-3 d-grid align-items-end">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">+ Взвешивание</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Журнал ЛПМ и Клинические осмотры животного -->
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="vg-card">
+            <div class="vg-card-header">
+                <h6 class="fw-bold mb-0">💉 История лечебно-профилактических обработок</h6>
+                <a asp-controller="Audit" asp-action="Index" asp-route-animalId="@a.Id" class="small text-decoration-none">История версий SQL Temporal →</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Дата</th>
+                            <th>Препарат / Серия</th>
+                            <th>Доза</th>
+                            <th>Диагноз</th>
+                            <th class="pe-3">Выведение (молоко)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Treatments.Count == 0)
+                        {
+                            <tr><td colspan="5" class="text-center py-3 text-muted small">Антибиотики и ветпрепараты не вводились.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var t in Model.Treatments)
+                            {
+                                var active = t.IsMilkWithdrawalActive(DateTime.UtcNow);
+                                <tr>
+                                    <td class="ps-3 small">@t.AdministeredAtUtc.AddHours(8).ToString("dd.MM.yy HH:mm")</td>
+                                    <td class="small">
+                                        <strong>@t.DrugNameSnapshot</strong>
+                                        <div class="text-muted">Серия: @t.DrugBatchSeriesSnapshot</div>
+                                    </td>
+                                    <td class="small">@t.DosageAmount.ToString("0.#") @t.DosageUnit</td>
+                                    <td class="small">@t.Diagnosis</td>
+                                    <td class="pe-3 small">
+                                        @if (active)
+                                        {
+                                            <span class="vg-badge-quarantine">До @t.MilkWithdrawalEndsAtUtc.AddHours(8).ToString("dd.MM HH:mm")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Выведен (@t.MilkWithdrawalHoursApplied ч)</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="vg-card">
+            <div class="vg-card-header">
+                <h6 class="fw-bold mb-0">📱 Осмотры по QR-паспорту и вакцинации</h6>
+            </div>
+            <div class="p-3">
+                @foreach (var ins in Model.Inspections.Take(4))
+                {
+                    <div class="p-2 mb-2 rounded border small" style="border-color: var(--vg-border) !important;">
+                        <div class="d-flex justify-content-between">
+                            <strong>Температура: @ins.BodyTemperatureC.ToString("0.0") °C • Пульс: @ins.HeartRateBpm</strong>
+                            <span class="text-muted">@ins.InspectedAtUtc.AddHours(8).ToString("dd.MM HH:mm")</span>
+                        </div>
+                        <div>@ins.Summary</div>
+                        <div class="text-muted">Врач: @ins.InspectorName</div>
+                    </div>
+                }
+                @if (Model.EpizooticHistory.Count > 0)
+                {
+                    <hr />
+                    <div class="small fw-bold mb-2">Выполненные противоэпизоотические мероприятия:</div>
+                    @foreach (var ep in Model.EpizooticHistory.Take(4))
+                    {
+                        <div class="small mb-1">
+                            ✓ <strong>@(ep.EpizooticAct?.EpizooticRule?.Title ?? "Обработка")</strong> — @ep.ResultText
+                            <span class="text-muted">(след.: @ep.NextDueAtUtc.ToString("dd.MM.yyyy"))</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>

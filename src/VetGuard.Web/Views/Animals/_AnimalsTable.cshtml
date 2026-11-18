@@ -1,0 +1,105 @@
+@model IReadOnlyList<AnimalListItemDto>
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+            <tr>
+                <th class="ps-3">Бирка / RFID-чип</th>
+                <th>Кличка / Порода</th>
+                <th>Пол / Возраст</th>
+                <th>Корпус и секция</th>
+                <th>Масса / Удой</th>
+                <th>Статус здоровья</th>
+                <th>Карантинный замок</th>
+                <th class="text-end pe-3">Действия и QR</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model.Count == 0)
+            {
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">По заданным фильтрам животные не найдены.</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var a in Model)
+                {
+                    <tr>
+                        <td class="ps-3">
+                            <a asp-action="Details" asp-route-id="@a.Id" class="fw-bold font-monospace text-decoration-none">
+                                @a.TagNumber
+                            </a>
+                            <div class="small text-muted font-monospace">RFID: @(a.RfidChip ?? "—")</div>
+                        </td>
+                        <td>
+                            <div class="fw-bold">@a.Name</div>
+                            <div class="small text-muted">@a.Breed</div>
+                        </td>
+                        <td>
+                            <div>@a.Sex.ToShortSex()</div>
+                            <div class="small text-muted">@a.FormattedAge</div>
+                        </td>
+                        <td>
+                            <div class="small fw-semibold">@a.BarnName</div>
+                            <div class="small text-muted">@a.SectionCode</div>
+                        </td>
+                        <td>
+                            <div class="small fw-semibold">@a.CurrentWeightKg.ToString("0") кг</div>
+                            @if (a.AverageDailyMilkKg.HasValue)
+                            {
+                                <div class="small text-success">@a.AverageDailyMilkKg.Value.ToString("0.0") л/сут</div>
+                            }
+                        </td>
+                        <td>
+                            @if (a.HealthStatus == HealthStatus.Healthy)
+                            {
+                                <span class="vg-badge-healthy">@a.HealthStatus.ToDisplayName()</span>
+                            }
+                            else if (a.HealthStatus == HealthStatus.Quarantine)
+                            {
+                                <span class="vg-badge-quarantine">@a.HealthStatus.ToDisplayName()</span>
+                            }
+                            else
+                            {
+                                <span class="vg-badge-treatment">@a.HealthStatus.ToDisplayName()</span>
+                            }
+                        </td>
+                        <td>
+                            @if (a.IsMilkQuarantineLocked && a.MilkLockEndsAtUtc.HasValue)
+                            {
+                                <div class="vg-timer-pill mb-1">
+                                    🔒 <span data-countdown-utc="@a.MilkLockEndsAtUtc.Value.ToString("O")">
+                                        @Math.Floor(a.RemainingMilkLockHours) ч
+                                    </span>
+                                </div>
+                                <div class="small text-danger fw-semibold">@a.ActiveLockDrugName</div>
+                            }
+                            else if (a.HealthStatus == HealthStatus.Quarantine)
+                            {
+                                <span class="vg-badge-quarantine">🔒 Изолятор (Запрет)</span>
+                            }
+                            else
+                            {
+                                <span class="vg-badge-healthy">✓ Свободна</span>
+                            }
+                        </td>
+                        <td class="text-end pe-3">
+                            <div class="btn-group btn-group-sm">
+                                <a asp-action="Details" asp-route-id="@a.Id" class="btn btn-outline-primary" title="Карточка, удои, привесы и QR">
+                                    Карточка
+                                </a>
+                                <a asp-route="passport" asp-route-tagNumber="@a.TagNumber" class="btn btn-outline-secondary" title="Мобильный экран ветврача">
+                                    📱 QR
+                                </a>
+                                <a asp-action="StallCardPdf" asp-route-id="@a.Id" class="btn btn-outline-success" title="Печать стойловой QR-карточки PDF">
+                                    PDF
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>

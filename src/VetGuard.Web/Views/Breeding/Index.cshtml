@@ -1,0 +1,117 @@
+@model BreedingIndexViewModel
+@{
+    ViewData["Title"] = "Племенной радар и Анти-инбридинг (T-SQL Recursive CTE)";
+}
+
+<div class="mb-4">
+    <h2 class="fw-bold mb-1">🧬 Племенной радар и калькулятор Анти-инбридинга</h2>
+    <p class="text-muted mb-0">
+        Построение генеалогического дерева предков на глубину до <strong>6 поколений</strong> и расчет коэффициента инбридинга Сьюэлла Райта ($F_X$) + шкалы Шапоружа прямо на стороне MS SQL Server через рекурсивные T-SQL запросы <code>WITH PedigreeTree AS (...)</code> (Dapper)
+    </p>
+</div>
+
+<!-- 1. Интерактивное генеалогическое дерево до 6 колен -->
+<div class="vg-card mb-4">
+    <div class="vg-card-header flex-wrap">
+        <div>
+            <h5 class="fw-bold mb-0">🌳 Интерактивное генеалогическое дерево предков (до VI колена)</h5>
+            <small class="text-muted">Синяя полоса — отцовская линия (♂), розовая — материнская (♀), янтарная рамка — повторяющийся общий предок</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="small fw-semibold text-nowrap">Животное стада:</label>
+            <select name="subjectId"
+                    class="form-select form-select-sm"
+                    style="min-width: 280px;"
+                    hx-get="@Url.Action("PedigreePartial", "Breeding")"
+                    hx-target="#pedigree-tree-container"
+                    hx-trigger="change">
+                @foreach (var s in Model.AllPedigreeSubjects)
+                {
+                    <option value="@s.Id" selected="@(s.Id == Model.SelectedSubjectId)">
+                        @s.Name [@s.TagNumber] — @s.Breed (@s.Sex.ToShortSex())
+                    </option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <div class="p-3" id="pedigree-tree-container">
+        @if (Model.InitialTree is not null)
+        {
+            @await Html.PartialAsync("_PedigreeTree", Model.InitialTree)
+        }
+    </div>
+</div>
+
+<!-- 2. Калькулятор подбора пары (Матка × Быки-производители) -->
+<div class="vg-card mb-4">
+    <div class="vg-card-header flex-wrap">
+        <div>
+            <h5 class="fw-bold mb-0">🎯 Калькулятор подбора племенных пар (Анти-инбридинг С. Райта)</h5>
+            <small class="text-muted">Пакетный поиск всех общих предков между выбранной маткой и всеми быками племрепродуктора за один рекурсивный T-SQL запрос</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="small fw-semibold text-nowrap">Выбрать матку (♀):</label>
+            <select name="damId"
+                    class="form-select form-select-sm"
+                    style="min-width: 280px;"
+                    hx-get="@Url.Action("EvaluatePairsPartial", "Breeding")"
+                    hx-target="#sire-eval-container"
+                    hx-trigger="change">
+                @foreach (var dam in Model.BreedingFemales)
+                {
+                    <option value="@dam.Id" selected="@(dam.Id == Model.SelectedDamId)">
+                        @dam.Name [@dam.TagNumber] — @dam.Breed
+                    </option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <div class="p-3" id="sire-eval-container">
+        @{
+            ViewBag.DamId = Model.SelectedDamId;
+        }
+        @await Html.PartialAsync("_SireEvaluationTable", Model.InitialCandidates)
+    </div>
+</div>
+
+<!-- 3. Утвержденный журнал племенных закреплений -->
+<div class="vg-card">
+    <div class="vg-card-header">
+        <h6 class="fw-bold mb-0">📋 Утвержденный план индивидуального подбора пар (Журнал селекционера)</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-3">Дата подбора</th>
+                    <th>Матка (♀)</th>
+                    <th>Бык-производитель (♂)</th>
+                    <th>Коэфф. Райта (F_X)</th>
+                    <th>Степень по Шапоружу</th>
+                    <th>Общие предки</th>
+                    <th class="pe-3">Селекционер</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.SavedPlans)
+                {
+                    <tr>
+                        <td class="ps-3 small">@p.PlannedAtUtc.AddHours(8).ToString("dd.MM.yyyy HH:mm")</td>
+                        <td class="fw-semibold">@(p.Dam?.Name) <span class="small text-muted font-monospace">[@(p.Dam?.TagNumber)]</span></td>
+                        <td class="fw-semibold">@(p.Sire?.Name) <span class="small text-muted font-monospace">[@(p.Sire?.TagNumber)]</span></td>
+                        <td>
+                            <span class="@(p.RiskLevel == InbreedingRiskLevel.Safe ? "vg-badge-healthy" : "vg-badge-treatment")">
+                                @p.InbreedingCoefficientPercent.ToString("0.00")%
+                            </span>
+                        </td>
+                        <td class="small fw-semibold">@p.ShaporuzhNotation</td>
+                        <td class="small text-muted">@p.CommonAncestorsSummary</td>
+                        <td class="pe-3 small">@p.CreatedBySelector</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

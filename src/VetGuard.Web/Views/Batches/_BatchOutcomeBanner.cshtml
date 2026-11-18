@@ -1,0 +1,47 @@
+@model BatchCreationOutcomeDto
+
+@if (Model.Succeeded)
+{
+    <div class="p-4 rounded-4 border border-success border-2 shadow-sm" style="background: var(--vg-success-soft);">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h5 class="fw-bold text-success mb-1">🟢 КАРАНТИННЫЙ КОНТРОЛЬ ПРОЙДЕН УСПЕШНО!</h5>
+                <div>@Model.Message</div>
+            </div>
+            @if (Model.BatchId.HasValue)
+            {
+                <a asp-controller="Batches" asp-action="CertificatePdf" asp-route-id="@Model.BatchId" class="btn btn-success btn-sm fw-semibold">
+                    📄 Скачать вет-справку партии (PDF)
+                </a>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="vg-quarantine-lock-box shadow">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <h4 class="fw-bold text-danger mb-1">⛔ СРАБОТАЛ ЖЕСТКИЙ «КАРАНТИННЫЙ ЗАМОК» — ТРАНЗАКЦИЯ ПАРТИИ ОТКЛОНЕНА!</h4>
+                <p class="mb-2 fw-semibold">@Model.Message</p>
+                @if (!string.IsNullOrWhiteSpace(Model.BlockedAnimalTag))
+                {
+                    <div class="small">
+                        • Заблокированное животное: <strong>@Model.BlockedAnimalName [@Model.BlockedAnimalTag]</strong><br />
+                        @if (!string.IsNullOrWhiteSpace(Model.BlockedDrugName))
+                        {
+                            <span>• Обнаруженный ветпрепарат: <strong>«@Model.BlockedDrugName»</strong> @(string.IsNullOrWhiteSpace(Model.BlockedDrugSeries) ? "" : $"(серия {Model.BlockedDrugSeries})")<br /></span>
+                        }
+                        @if (Model.RemainingQuarantineHours.HasValue && Model.RemainingQuarantineHours.Value > 0)
+                        {
+                            var hrs = (int)Math.Floor(Model.RemainingQuarantineHours.Value);
+                            var mins = (int)Math.Round((Model.RemainingQuarantineHours.Value - hrs) * 60);
+                            <span>• Точный остаток карантина: <strong class="text-danger">@hrs ч @mins мин</strong> (до @(Model.ClearanceUtc?.AddHours(8).ToString("dd.MM.yyyy HH:mm")) ИКТ)</span>
+                        }
+                    </div>
+                }
+            </div>
+            <span class="badge bg-danger fs-6 px-3 py-2">ROLLBACK + SIGNALR ALERT</span>
+        </div>
+    </div>
+}

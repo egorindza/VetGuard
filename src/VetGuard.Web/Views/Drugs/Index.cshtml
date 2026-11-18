@@ -1,0 +1,150 @@
+@model IReadOnlyList<VetDrug>
+@{
+    ViewData["Title"] = "Справочник ветпрепаратов и вакцин";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h2 class="fw-bold mb-1">💊 Справочник ветпрепаратов, антибиотиков и биопрепаратов</h2>
+        <p class="text-muted mb-0">Нормативные сроки выведения по молоку (в часах) и мясу (в сутках), складской учет серий с защитой Optimistic Concurrency (<code>rowversion</code>)</p>
+    </div>
+    <button class="btn btn-vg-primary" type="button" data-bs-toggle="collapse" data-bs-target="#newDrugCollapse">
+        + Добавить препарат в справочник
+    </button>
+</div>
+
+<div class="collapse mb-4" id="newDrugCollapse">
+    <div class="vg-card p-4">
+        <h5 class="fw-bold mb-3">Регистрация новой серии ветпрепарата / вакцины</h5>
+        <form asp-action="Create" method="post" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Торговое наименование *</label>
+                <input type="text" name="Name" class="form-control" required placeholder="Напр. Цефтиофур-Макс 5%" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Действующее вещество *</label>
+                <input type="text" name="ActiveSubstance" class="form-control" required placeholder="Цефтиофура гидрохлорид 50 мг/мл" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Фармакологическая группа *</label>
+                <select name="Category" class="form-select">
+                    @foreach (var cat in Enum.GetValues<DrugCategory>())
+                    {
+                        <option value="@cat">@cat.ToDisplayName()</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold">Производитель *</label>
+                <input type="text" name="Manufacturer" class="form-control" required value="НИТА-ФАРМ" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold">Заводская серия *</label>
+                <input type="text" name="BatchSeries" class="form-control" required placeholder="CEF-1126-04" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold">Срок годности *</label>
+                <input type="date" name="ExpirationDate" value="@DateTime.UtcNow.AddYears(1).ToString("yyyy-MM-dd")" class="form-control" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold">Начальный остаток *</label>
+                <div class="input-group">
+                    <input type="number" step="0.1" name="StockDoses" value="200" class="form-control" required />
+                    <input type="text" name="Unit" value="мл" class="form-control" style="max-width:75px;" required />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold text-danger">Ожидание: МОЛОКО (часов) *</label>
+                <input type="number" name="MilkWithdrawalHours" value="72" class="form-control border-danger" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-semibold text-warning">Ожидание: МЯСО (суток) *</label>
+                <input type="number" name="MeatWithdrawalDays" value="14" class="form-control" required />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-semibold">Рекомендуемая доза</label>
+                <input type="text" name="DefaultDosageText" value="1 мл на 50 кг массы тела п/к" class="form-control" />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" name="IsPotent" value="true" id="potentCheck" checked />
+                    <label class="form-check-label small fw-semibold" for="potentCheck">Сильнодейств.</label>
+                </div>
+            </div>
+            <div class="col-12 text-end">
+                <button type="submit" class="btn btn-vg-primary">Сохранить в справочник</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="vg-card">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th class="ps-3">Наименование / МНН</th>
+                    <th>Категория</th>
+                    <th>Серия / Годен до</th>
+                    <th>Карантин (Молоко)</th>
+                    <th>Карантин (Мясо)</th>
+                    <th>Остаток на ветскладе</th>
+                    <th class="pe-3 text-end">Приход серии (RowVersion)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in Model)
+                {
+                    var expired = d.IsExpired(DateTime.UtcNow);
+                    <tr>
+                        <td class="ps-3">
+                            <div class="fw-bold">
+                                @d.Name
+                                @if (d.IsPotent)
+                                {
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 ms-1">Список Б</span>
+                                }
+                            </div>
+                            <div class="small text-muted">@d.ActiveSubstance • @d.Manufacturer</div>
+                            <div class="small text-muted">Дозировка: @d.DefaultDosageText</div>
+                        </td>
+                        <td><span class="badge bg-secondary bg-opacity-10 text-body border">@d.Category.ToDisplayName()</span></td>
+                        <td class="small">
+                            <div class="font-monospace fw-semibold">@d.BatchSeries</div>
+                            <div class="@(expired ? "text-danger fw-bold" : "text-muted")">до @d.ExpirationDate.ToString("dd.MM.yyyy")</div>
+                        </td>
+                        <td>
+                            @if (d.MilkWithdrawalHours > 0)
+                            {
+                                <span class="vg-badge-quarantine">🔒 @d.MilkWithdrawalHours ч (@(Math.Round(d.MilkWithdrawalHours / 24.0, 1)) сут)</span>
+                            }
+                            else
+                            {
+                                <span class="vg-badge-healthy">0 ч (Без браковки)</span>
+                            }
+                        </td>
+                        <td>
+                            @if (d.MeatWithdrawalDays > 0)
+                            {
+                                <span class="vg-badge-treatment">@d.MeatWithdrawalDays сут</span>
+                            }
+                            else
+                            {
+                                <span class="vg-badge-healthy">0 сут</span>
+                            }
+                        </td>
+                        <td class="fw-bold">@d.StockDoses.ToString("0.#") @d.Unit</td>
+                        <td class="pe-3">
+                            <form asp-action="Replenish" method="post" class="d-flex justify-content-end gap-1">
+                                <input type="hidden" name="DrugId" value="@d.Id" />
+                                <input type="hidden" name="ExpectedRowVersionBase64" value="@Convert.ToBase64String(d.RowVersion)" />
+                                <input type="number" step="1" name="AdditionalDoses" value="50" class="form-control form-control-sm" style="width:78px;" required />
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Пополнить запас с проверкой RowVersion">+ Приход</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
