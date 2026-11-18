@@ -7,14 +7,13 @@
     var isQuarantined = a.HealthStatus == HealthStatus.Quarantine;
 }
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+<header class="page-header">
     <div>
-        <a asp-action="Index" class="small text-decoration-none text-muted">← Вернуться в реестр поголовья</a>
-        <h2 class="fw-bold mb-0 mt-1">
-            @a.Name <span class="font-monospace fs-5 text-muted">[@a.TagNumber]</span>
-        </h2>
+        <p class="eyebrow">Ветеринарный QR-паспорт и продуктивность · @a.Breed</p>
+        <h1>@a.Name <span class="font-monospace fs-5 text-muted">[@a.TagNumber]</span></h1>
+        <p class="page-description">Размещение: @a.BarnName (@a.SectionCode) · Возраст: @a.GetFormattedAge(DateTime.UtcNow) · RFID: @(a.RfidChip ?? "не чипировано")</p>
     </div>
-    <div class="d-flex flex-wrap gap-2">
+    <div class="header-actions">
         <button type="button"
                 class="btn btn-outline-secondary btn-sm"
                 hx-get="@Url.Action("EditModal", "Animals", new { id = a.Id })"
@@ -28,14 +27,14 @@
         <a asp-controller="Breeding" asp-action="Index" asp-route-subjectId="@a.Id" asp-route-damId="@(a.Sex == AnimalSex.Female ? a.Id : null)" class="btn btn-outline-primary btn-sm">
             🧬 Родословная (6 колен)
         </a>
-        <a asp-action="StallCardPdf" asp-route-id="@a.Id" class="btn btn-vg-primary btn-sm">
+        <a asp-action="StallCardPdf" asp-route-id="@a.Id" class="btn btn-primary btn-sm">
             🖨️ Стойловая QR-карточка (PDF)
         </a>
-        <a asp-action="VetExtractPdf" asp-route-id="@a.Id" class="btn btn-outline-success btn-sm">
+        <a asp-action="VetExtractPdf" asp-route-id="@a.Id" class="btn btn-outline-primary btn-sm">
             📄 Вет-выписка (PDF)
         </a>
     </div>
-</div>
+</header>
 
 <!-- Баннер активного Карантинного замка -->
 @if (hasMilkLock || hasMeatLock || isQuarantined)
@@ -221,7 +220,7 @@
                 }
                 else
                 {
-                    <svg viewBox="0 0 520 185" class="w-100 mb-3" role="img" aria-label="График удоев">
+                    <svg viewBox="0 0 520 185" class="w-100 mb-1 vet-export-chart" role="img" aria-label="График удоев">
                         <line x1="35" y1="150" x2="505" y2="150" stroke="currentColor" stroke-opacity="0.2" />
                         <line x1="35" y1="20" x2="505" y2="20" stroke="currentColor" stroke-opacity="0.1" stroke-dasharray="4" />
                         @{
@@ -233,8 +232,8 @@
                                 var barH = (double)(y.TotalLiters / maxMilk) * 125.0;
                                 var x = 42.0 + i * slotWidth;
                                 var topY = 150.0 - barH;
-                                var fill = y.IsQuarantineDiscarded ? "#dc2626" : "#10b981";
-                                <g>
+                                var fill = y.IsQuarantineDiscarded ? "#dc2626" : "#1c7c49";
+                                <g data-tip="@($"{y.MilkingDate:dd.MM.yyyy}: {y.TotalLiters:0.0} л (утро {y.MorningLiters:0.0} + вечер {y.EveningLiters:0.0}, жир {y.FatPercent:0.00}%){(y.IsQuarantineDiscarded ? " — СЕПАРИРОВАНО (КАРАНТИН)" : "")}")">
                                     <rect x="@x.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
                                           y="@topY.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
                                           width="@Math.Max(14.0, slotWidth - 10).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
@@ -296,17 +295,17 @@
                     var y = 145.0 - (double)((weights[i].WeightKg - minW) / spanW) * 115.0;
                     pts.Add($"{x.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)},{y.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}");
                 }
-                <svg viewBox="0 0 520 185" class="w-100 mb-3" role="img" aria-label="График живой массы">
+                <svg viewBox="0 0 520 185" class="w-100 mb-1 vet-export-chart" role="img" aria-label="График живой массы">
                     <line x1="35" y1="150" x2="505" y2="150" stroke="currentColor" stroke-opacity="0.2" />
-                    <polyline fill="none" stroke="#0284c7" stroke-width="3" points="@string.Join(" ", pts)" />
+                    <polyline fill="none" stroke="#1c7c49" stroke-width="3" points="@string.Join(" ", pts)" />
                     @for (var i = 0; i < wCount; i++)
                     {
                         var x = wCount == 1 ? 260.0 : 45.0 + i * (430.0 / (wCount - 1));
                         var y = 145.0 - (double)((weights[i].WeightKg - minW) / spanW) * 115.0;
-                        <g>
+                        <g data-tip="@($"{weights[i].MeasuredAtUtc:dd.MM.yyyy}: {weights[i].WeightKg:0.0} кг (привес: {weights[i].DailyGainGrams} г/сут)")">
                             <circle cx="@x.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
                                     cy="@y.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
-                                    r="5" fill="#0284c7" />
+                                    r="5" fill="#1c7c49" />
                             <text x="@x.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)"
                                   y="@((y - 9).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))"
                                   text-anchor="middle" font-size="10" font-weight="bold" fill="currentColor">@weights[i].WeightKg.ToString("0")</text>

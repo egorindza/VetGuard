@@ -3,21 +3,24 @@
     ViewData["Title"] = "Контроль партий продукции и Карантинный замок";
 }
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+<header class="page-header">
     <div>
-        <h2 class="fw-bold mb-1">🔒 Контроль товарных партий и жесткий «Карантинный замок»</h2>
-        <p class="text-muted mb-0">Транзакционная проверка каждого животного перед включением в танк молока или партию на отгрузку + защита от гонок <code>SQL rowversion</code></p>
+        <p class="eyebrow">Ветеринарно-санитарная экспертиза сырья</p>
+        <h1>Контроль товарных партий и жесткий «Карантинный замок»</h1>
+        <p class="page-description">Транзакционная проверка каждого животного перед включением в танк молока или партию на отгрузку с защитой от гонок <code>SQL rowversion</code>.</p>
     </div>
-    <form asp-action="TriggerDemoQuarantineTest"
-          method="post"
-          hx-post="@Url.Action("TriggerDemoQuarantineTest", "Batches")"
-          hx-target="#batch-outcome-zone"
-          hx-swap="innerHTML">
-        <button type="submit" class="btn btn-danger fw-bold shadow-sm">
-            ⚡ Демо-тест: Попытаться сдать карантинное молоко (Зорька-4)
-        </button>
-    </form>
-</div>
+    <div class="header-actions">
+        <form asp-action="TriggerDemoQuarantineTest"
+              method="post"
+              hx-post="@Url.Action("TriggerDemoQuarantineTest", "Batches")"
+              hx-target="#batch-outcome-zone"
+              hx-swap="innerHTML">
+            <button type="submit" class="btn btn-danger fw-bold shadow-sm">
+                ⚡ Демо-тест: Попытаться сдать карантинное молоко (Зорька-4)
+            </button>
+        </form>
+    </div>
+</header>
 
 <!-- Зона результата проверки карантинного замка (HTMX или POST) -->
 <div id="batch-outcome-zone" class="mb-4">

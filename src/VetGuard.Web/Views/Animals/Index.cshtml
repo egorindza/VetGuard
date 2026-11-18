@@ -3,21 +3,22 @@
     ViewData["Title"] = "Реестр поголовья и QR-паспорта";
 }
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+<header class="page-header">
     <div>
-        <h2 class="fw-bold mb-1">🐄 Реестр племенного и товарного поголовья</h2>
-        <p class="text-muted mb-0">Учетные карточки КРС, радиочастотные RFID-транспондеры, печать стойловых QR-паспортов и статус выведения ветпрепаратов</p>
+        <p class="eyebrow">Модуль зоотехнического и ветеринарного учета</p>
+        <h1>Реестр племенного и товарного поголовья</h1>
+        <p class="page-description">Учетные карточки КРС, радиочастотные RFID-транспондеры ISO 11784, печать стойловых QR-паспортов и статус выведения ветпрепаратов.</p>
     </div>
-    <div>
+    <div class="header-actions">
         <button type="button"
-                class="btn btn-vg-primary"
+                class="btn btn-primary"
                 hx-get="@Url.Action("CreateModal", "Animals")"
                 hx-target="#vg-modal-content"
                 hx-swap="innerHTML">
             + Зарегистрировать животное
         </button>
     </div>
-</div>
+</header>
 
 <!-- Живая панель фильтрации на HTMX -->
 <div class="vg-card p-3 mb-4">

@@ -4,18 +4,21 @@
     var createdActId = TempData["CreatedActId"] as string;
 }
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+<header class="page-header">
     <div>
-        <h2 class="fw-bold mb-1">🗓️ Противоэпизоотический план и Карантинный изолятор</h2>
-        <p class="text-muted mb-0">Автоматический контроль сроков обязательных вакцинаций и исследований (сибирская язва, туберкулинизация, бруцеллёз, лейкоз), групповая обработка в 2 клика и генерация PDF-актов</p>
+        <p class="eyebrow">Государственный противоэпизоотический надзор</p>
+        <h1>Противоэпизоотический план и Карантинный изолятор</h1>
+        <p class="page-description">Автоматический контроль сроков обязательных вакцинаций и исследований (сибирская язва, туберкулинизация, бруцеллёз, лейкоз), групповая обработка в 2 клика и генерация PDF-актов.</p>
     </div>
     @if (!string.IsNullOrWhiteSpace(createdActId) && Guid.TryParse(createdActId, out var newActGuid))
     {
-        <a asp-action="ActPdf" asp-route-id="@newActGuid" class="btn btn-success fw-bold shadow-sm">
-            🖨️ Скачать созданный PDF-Акт обработки
-        </a>
+        <div class="header-actions">
+            <a asp-action="ActPdf" asp-route-id="@newActGuid" class="btn btn-primary">
+                🖨️ Скачать созданный PDF-Акт обработки
+            </a>
+        </div>
     }
-</div>
+</header>
 
 <!-- 1. Обязательный противоэпизоотический план по возрасту и срокам ревакцинации -->
 <div class="row g-4 mb-4">

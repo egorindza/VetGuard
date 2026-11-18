@@ -1,204 +1,280 @@
 ﻿@model DashboardSummaryDto
 @{
-    ViewData["Title"] = "Оперативная сводка ветслужбы";
+    ViewData["Title"] = "Обзор и сводка";
 }
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+<!-- Hero-секция в едином визуальном стиле с ITS AgroVision V2 -->
+<section class="dashboard-hero">
     <div>
-        <h2 class="fw-bold mb-1">Оперативный пульт ветеринарно-санитарного и племенного контроля</h2>
-        <p class="text-muted mb-0">Учебно-опытное фермерское хозяйство ФГБОУ ВО Иркутский ГАУ • Контроль карантина молока, мяса и генетики стада в реальном времени</p>
+        <p class="eyebrow">ИрГАУ VetGuard · ветеринарный факультет и учхоз «Молодёжное»</p>
+        <h1>От электронного QR-паспорта стойла к жесткому карантинному замку и чистоте породы.</h1>
+        <p>Контролируйте сроки полного выведения антибиотиков по молоку в часах и по мясу в сутках, программно блокируйте попадание карантинного сырья в сборный танк и рассчитывайте риск инбридинга до VI колена на уровне СУБД.</p>
+        <div class="header-actions mt-3">
+            <a class="btn btn-primary" asp-controller="Batches" asp-action="Index">Проверить партию и Карантинный замок</a>
+            <a class="btn btn-outline-primary" asp-controller="Breeding" asp-action="Index">Открыть Племенной радар (CTE)</a>
+            <a class="btn btn-outline-secondary" asp-controller="Treatments" asp-action="Index">Назначить ветпрепарат</a>
+        </div>
     </div>
-    <div class="d-flex flex-wrap gap-2">
-        <a asp-controller="Treatments" asp-action="Index" class="btn btn-danger fw-semibold">
-            💉 Зарегистрировать вет-обработку
-        </a>
-        <a asp-controller="Batches" asp-action="Index" class="btn btn-vg-primary">
-            🔒 Проверить партию молока
-        </a>
-        <a asp-controller="Breeding" asp-action="Index" class="btn btn-outline-secondary fw-semibold">
-            🧬 Племенной радар (CTE)
-        </a>
+    <div class="hero-illustration" aria-hidden="true">
+        <svg viewBox="0 0 260 170">
+            <!-- Стилизованный щит биозащиты, пульс ЭКГ и ветви родословной -->
+            <path d="M130 16 L202 42 V90 C202 128 168 152 130 162 C92 152 58 128 58 90 V42 Z" fill="rgba(28, 124, 73, 0.1)" stroke="currentColor" stroke-width="3" />
+            <polyline points="24,104 78,104 96,72 116,132 136,56 154,112 172,96 236,96" fill="none" stroke="#d97706" stroke-width="2.6" stroke-linejoin="round" />
+            <circle cx="130" cy="48" r="5" fill="currentColor" />
+            <circle cx="96" cy="72" r="4.5" fill="#2563eb" />
+            <circle cx="154" cy="112" r="4.5" fill="currentColor" />
+            <rect x="122" y="128" width="16" height="14" rx="3" fill="#dc2626" />
+        </svg>
     </div>
-</div>
+</section>
 
-<!-- KPI карточки -->
-<div class="row g-3 mb-4">
-    <div class="col-sm-6 col-xl-2">
-        <div class="vg-kpi">
-            <div class="vg-kpi-label mb-1">Поголовье стада</div>
-            <div class="vg-kpi-value">@Model.TotalActiveLivestock <small class="fs-6 fw-normal text-muted">гол.</small></div>
-            <div class="small text-muted mt-1">Дойных коров: <strong>@Model.MilkingCowsCount</strong></div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-2">
-        <div class="vg-kpi" style="border-left: 4px solid #dc2626;">
-            <div class="vg-kpi-label mb-1 text-danger">Карантинный замок</div>
-            <div class="vg-kpi-value text-danger">@Model.ActiveQuarantineLocksCount <small class="fs-6 fw-normal">гол.</small></div>
-            <div class="small text-muted mt-1">Активный вывод препаратов</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-2">
-        <div class="vg-kpi" style="border-left: 4px solid #d97706;">
-            <div class="vg-kpi-label mb-1">В изоляторе</div>
-            <div class="vg-kpi-value text-warning">@Model.QuarantineIsolatorCount <small class="fs-6 fw-normal">гол.</small></div>
-            <div class="small text-muted mt-1">Строгий боксовый фильтр</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-2">
-        <div class="vg-kpi" style="border-left: 4px solid #15803d;">
-            <div class="vg-kpi-label mb-1">Безопасный надой</div>
-            <div class="vg-kpi-value text-success">@Model.TodayTotalSafeMilkLiters.ToString("0.0") <small class="fs-6 fw-normal">л</small></div>
-            <div class="small text-muted mt-1">Допущено в товарный танк</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-2">
-        <div class="vg-kpi">
-            <div class="vg-kpi-label mb-1">Эпизоот-план</div>
-            <div class="vg-kpi-value @(Model.OverdueEpizooticTasksCount > 0 ? "text-warning" : "text-success")">@Model.OverdueEpizooticTasksCount</div>
-            <div class="small text-muted mt-1">Требуют прививки/пробы</div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-xl-2">
-        <div class="vg-kpi">
-            <div class="vg-kpi-label mb-1">Отбито нарушений</div>
-            <div class="vg-kpi-value text-danger">@Model.BlockedBatchAttemptsCount</div>
-            <div class="small text-muted mt-1">Блокировок сдачи сырья</div>
-        </div>
-    </div>
-</div>
-
-<!-- Действующие красные таймеры обратного отсчета карантина -->
-<div class="vg-card mb-4">
-    <div class="vg-card-header">
+<!-- Сводные KPI-карточки (.analysis-summary) -->
+<section class="dashboard-section">
+    <div class="section-heading">
         <div>
-            <h5 class="fw-bold mb-0 d-flex align-items-center gap-2">
+            <p class="eyebrow">Состояние стада и биобезопасности</p>
+            <h2>Сводные оперативные показатели</h2>
+        </div>
+        <p>Быстрый поиск по бирке, кличке или препарату: <kbd class="cmdk-kbd">Ctrl + K</kbd></p>
+    </div>
+    <div class="analysis-summary">
+        <article>
+            <span>Действующее поголовье</span>
+            <strong>@Model.TotalActiveLivestock</strong>
+            <small>дойных коров: @Model.MilkingCowsCount гол.</small>
+        </article>
+        <article style="border-left: 4px solid #dc2626;">
+            <span>Активный карантинный замок</span>
+            <strong class="text-danger">@Model.ActiveQuarantineLocksCount</strong>
+            <small>строгий запрет реализации</small>
+        </article>
+        <article style="border-left: 4px solid #d97706;">
+            <span>Карантинный изолятор</span>
+            <strong style="color:#d97706;">@Model.QuarantineIsolatorCount</strong>
+            <small>боксовый инфекционный фильтр</small>
+        </article>
+        <article>
+            <span>Товарный надой за сутки</span>
+            <strong class="text-success">@Model.TodayTotalSafeMilkLiters.ToString("0.0") л</strong>
+            <small>прошло карантинный контроль</small>
+        </article>
+        <article>
+            <span>Эпизоотический план</span>
+            <strong>@Model.OverdueEpizooticTasksCount</strong>
+            <small>ожидают вакцинации / пробы</small>
+        </article>
+        <article>
+            <span>Отбито нарушений сдачи</span>
+            <strong class="text-danger">@Model.BlockedBatchAttemptsCount</strong>
+            <small>перехвачено карантинным замком</small>
+        </article>
+    </div>
+</section>
+
+<!-- Интерактивная схема корпусов учебно-опытной фермы ИрГАУ -->
+<section class="dashboard-section panel">
+    <div class="section-heading mb-3">
+        <div>
+            <p class="eyebrow">Пространственный контур биозащиты</p>
+            <h2>Схема корпусов и санитарных зон Учхоза «Молодёжное» ИрГАУ</h2>
+        </div>
+        <span class="small text-muted">Нажмите на корпус для просмотра режима содержания и перехода</span>
+    </div>
+
+    <div class="irkutsk-map-box">
+        <svg viewBox="0 0 560 230" class="irkutsk-svg-map" role="img" aria-label="Схема корпусов и карантинных барьеров учхоза ИрГАУ">
+            <!-- Периметр территории фермы -->
+            <rect x="24" y="22" width="512" height="186" rx="18" fill="rgba(28, 124, 73, 0.07)" stroke="#2f7a50" stroke-width="1.8" stroke-dasharray="6 4" />
+            <!-- Молокопровод к танку охлаждения -->
+            <path d="M 165,82 L 325,82 L 325,145" fill="none" stroke="#1c7c49" stroke-width="2.5" stroke-dasharray="5 3" />
+            <!-- Санитарный барьер изолятора -->
+            <path d="M 405,30 L 405,200" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="4 4" opacity="0.7" />
+            <text x="415" y="44" font-size="10" fill="#dc2626" font-weight="700">ДЕЗБАРЬЕР</text>
+
+            <!-- Узел 1: Молочный корпус №1 -->
+            <g class="irkutsk-node" tabindex="0"
+               data-node-title="Учебный корпус №1 (Молочный блок)"
+               data-node-desc="Основное дойное стадо голштинской и черно-пестрой пород. Стойла оборудованы индивидуальными QR-паспортами; коровы Зорька-4 и Ночка-12 выделены красным замком."
+               data-node-link="/Animals?BarnName=%D0%A3%D1%87%D0%B5%D0%B1%D0%BD%D1%8B%D0%B9+%D0%BA%D0%BE%D1%80%D0%BF%D1%83%D1%81+%E2%84%961+%28%D0%9C%D0%BE%D0%BB%D0%BE%D1%87%D0%BD%D1%8B%D0%B9%29"
+               data-node-spark="118,122,121,125,123.6,126">
+                <rect x="52" y="54" width="128" height="54" rx="10" fill="#1c7c49" stroke="#ffffff" stroke-width="2" />
+                <text x="116" y="79" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff">Молочный №1 ★</text>
+                <text x="116" y="95" text-anchor="middle" font-size="9.5" fill="#dcfce7">6 дойных · 2 под замком</text>
+            </g>
+
+            <!-- Узел 2: Племрепродуктор №2 -->
+            <g class="irkutsk-node" tabindex="0"
+               data-node-title="Племрепродуктор №2 (Бычник)"
+               data-node-desc="Содержит 4 племенных быков-производителей (Алмаз-Сибирь, Енисей-Люкс, Гром-Байкал, Буран-Гранд) с полной 6-коленной родословной для анти-инбридинг подбора."
+               data-node-link="/Breeding"
+               data-node-spark="0,1.56,3.12,4.69,6.25,12.5">
+                <rect x="52" y="132" width="128" height="52" rx="10" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
+                <text x="116" y="155" text-anchor="middle" font-size="11.5" font-weight="700" fill="#ffffff">Племрепродуктор №2</text>
+                <text x="116" y="171" text-anchor="middle" font-size="9.5" fill="#dbeafe">4 быка · линии ГПК</text>
+            </g>
+
+            <!-- Узел 3: Сборный танк молока и ВСД -->
+            <g class="irkutsk-node" tabindex="0"
+               data-node-title="Молочный блок и пост ветсанэкспертизы (ВСД)"
+               data-node-desc="Узел формирования товарных партий на молзавод АО «Янтарь». Автоматический транзакционный замок блокирует слив молока от коров с невыведенными антибиотиками."
+               data-node-link="/Batches"
+               data-node-spark="112,116,115,119,117.6,123.6">
+                <circle cx="325" cy="152" r="30" fill="#d97706" stroke="#ffffff" stroke-width="2.5" />
+                <text x="325" y="149" text-anchor="middle" font-size="10.5" font-weight="700" fill="#ffffff">Танк ВСД</text>
+                <text x="325" y="163" text-anchor="middle" font-size="9" fill="#fef3c7">Карантин-щит</text>
+            </g>
+
+            <!-- Узел 4: Карантинный изолятор -->
+            <g class="irkutsk-node" tabindex="0"
+               data-node-title="Карантинный изолятор (Инфекционный фильтр)"
+               data-node-desc="Изолированные боксы 30-дневного карантинирования вновь прибывшего скота и животных с подозрением на инфекционные заболевания (Метелица-21, Бокс №2)."
+               data-node-link="/Epizootics"
+               data-node-spark="39.8,39.7,39.6,39.4,39.3,39.1">
+                <rect x="424" y="88" width="96" height="68" rx="10" fill="#dc2626" stroke="#ffffff" stroke-width="2" />
+                <text x="472" y="118" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Изолятор</text>
+                <text x="472" y="135" text-anchor="middle" font-size="9.5" fill="#fee2e2">Бокс №1–3</text>
+            </g>
+        </svg>
+
+        <div class="panel" style="box-shadow:none;" id="farmNodeCard">
+            <span class="agro-badge agro-badge-warn mb-2">Выбранное подразделение</span>
+            <h3 class="h5 mb-1" id="farmNodeTitle">Учебный корпус №1 (Молочный блок)</h3>
+            <p class="small text-muted mb-2" id="farmNodeDesc">Основное дойное стадо голштинской и черно-пестрой пород. Стойла оборудованы индивидуальными QR-паспортами; коровы Зорька-4 и Ночка-12 выделены красным замком.</p>
+            <div class="mb-2">
+                <small class="text-muted d-block mb-1">Профиль оперативного показателя подразделения:</small>
+                <svg id="farmNodeSparkline" viewBox="0 0 220 46" width="220" height="46" aria-hidden="true">
+                    <polyline id="farmNodeSparkPoly" fill="none" stroke="#1c7c49" stroke-width="2.6" points="8,34 48,24 88,26 128,14 168,18 210,10" />
+                </svg>
+            </div>
+            <a id="farmNodeLink" href="/Animals" class="btn btn-sm btn-outline-primary">Перейти в модуль подразделения →</a>
+        </div>
+    </div>
+</section>
+
+<!-- Действующие таймеры Карантинного замка -->
+<section class="dashboard-section panel">
+    <div class="section-heading mb-3">
+        <div>
+            <p class="eyebrow text-danger">Активный фармнадзор</p>
+            <h2 class="d-flex align-items-center gap-2">
                 <span class="vg-pulse-dot"></span>
                 Действующие «Карантинные замки» — Обратный отсчет выведения препаратов
-            </h5>
-            <small class="text-muted">Продукция перечисленных животных программно заблокирована от включения в товарные партии молока и убоя</small>
+            </h2>
         </div>
-        <a asp-controller="Batches" asp-action="Index" class="btn btn-sm btn-outline-danger fw-semibold">
-            Испытать блокировку партии →
-        </a>
+        <a asp-controller="Batches" asp-action="Index" class="btn btn-sm btn-outline-danger">Испытать блокировку партии →</a>
     </div>
 
-    <div class="p-3">
-        @if (Model.ActiveTimers.Count == 0)
-        {
-            <div class="text-center py-4 text-muted">Активных медикаментозных карантинных блокировок в данный момент нет.</div>
-        }
-        else
-        {
-            <div class="table-responsive">
-                <table class="table align-middle mb-0">
-                    <thead>
+    @if (Model.ActiveTimers.Count == 0)
+    {
+        <div class="text-center py-4 text-muted">Активных медикаментозных карантинных блокировок в данный момент нет.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Животное / Бирка</th>
+                        <th>Корпус</th>
+                        <th>Введенный препарат / Серия</th>
+                        <th>Остаток карантина (молоко)</th>
+                        <th>Полное выведение (ИКТ)</th>
+                        <th>Карантин по мясу</th>
+                        <th class="text-end">Паспорт</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var timer in Model.ActiveTimers)
+                    {
                         <tr>
-                            <th>Животное / Бирка</th>
-                            <th>Корпус</th>
-                            <th>Введенный препарат / Серия</th>
-                            <th>Таймер карантина по молоку</th>
-                            <th>Полное выведение (ИКТ)</th>
-                            <th>Карантин по мясу</th>
-                            <th class="text-end">Паспорт</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var timer in Model.ActiveTimers)
-                        {
-                            <tr>
-                                <td>
-                                    <a asp-controller="Animals" asp-action="Details" asp-route-id="@timer.AnimalId" class="fw-bold text-decoration-none">
-                                        @timer.AnimalName
-                                    </a>
-                                    <div class="small text-muted font-monospace">@timer.TagNumber</div>
-                                </td>
-                                <td class="small">@timer.BarnName</td>
-                                <td>
-                                    <span class="fw-semibold">@timer.DrugName</span>
-                                    <div class="small text-muted">Серия: @timer.DrugSeries</div>
-                                </td>
-                                <td>
-                                    @if (timer.IsMilkLocked)
-                                    {
-                                        <span class="vg-timer-pill">
-                                            🔒 <span data-countdown-utc="@timer.MilkWithdrawalEndsAtUtc.ToString("O")">
-                                                @Math.Floor(timer.RemainingMilkHours) ч
-                                            </span>
+                            <td>
+                                <a asp-controller="Animals" asp-action="Details" asp-route-id="@timer.AnimalId" class="fw-bold text-decoration-none">
+                                    @timer.AnimalName
+                                </a>
+                                <div class="small text-muted font-monospace">@timer.TagNumber</div>
+                            </td>
+                            <td class="small">@timer.BarnName</td>
+                            <td>
+                                <span class="fw-semibold">@timer.DrugName</span>
+                                <div class="small text-muted">Серия: @timer.DrugSeries</div>
+                            </td>
+                            <td>
+                                @if (timer.IsMilkLocked)
+                                {
+                                    <span class="vg-timer-pill">
+                                        🔒 <span data-countdown-utc="@timer.MilkWithdrawalEndsAtUtc.ToString("O")">
+                                            @Math.Floor(timer.RemainingMilkHours) ч
                                         </span>
-                                    }
-                                    else
-                                    {
-                                        <span class="vg-badge-healthy">Молоко разрешено</span>
-                                    }
-                                </td>
-                                <td class="small fw-semibold">
-                                    @timer.MilkWithdrawalEndsAtUtc.AddHours(8).ToString("dd.MM.yyyy HH:mm")
-                                </td>
-                                <td>
-                                    @if (timer.IsMeatLocked)
-                                    {
-                                        <span class="vg-badge-quarantine">Мясо: еще @Math.Ceiling(timer.RemainingMeatDays) сут.</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="vg-badge-healthy">Снят</span>
-                                    }
-                                </td>
-                                <td class="text-end">
-                                    <a asp-route="passport" asp-route-tagNumber="@timer.TagNumber" class="btn btn-sm btn-outline-secondary">
-                                        📱 QR-осмотр
-                                    </a>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        }
-    </div>
-</div>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="agro-badge">Молоко разрешено</span>
+                                }
+                            </td>
+                            <td class="small fw-semibold">
+                                @timer.MilkWithdrawalEndsAtUtc.AddHours(8).ToString("dd.MM.yyyy HH:mm")
+                            </td>
+                            <td>
+                                @if (timer.IsMeatLocked)
+                                {
+                                    <span class="vg-badge-quarantine">Мясо: еще @Math.Ceiling(timer.RemainingMeatDays) сут.</span>
+                                }
+                                else
+                                {
+                                    <span class="agro-badge">Снят</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <a asp-route="passport" asp-route-tagNumber="@timer.TagNumber" class="btn btn-sm btn-outline-secondary">
+                                    📱 QR-осмотр
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
 
-<div class="row g-4">
-    <!-- Недавние заблокированные попытки сдачи карантинного молока -->
-    <div class="col-lg-6">
-        <div class="vg-card h-100">
-            <div class="vg-card-header">
-                <h6 class="fw-bold mb-0">🚨 Журнал перехваченных нарушений «Карантинного замка»</h6>
-                <a asp-controller="Batches" asp-action="Index" class="small text-decoration-none">Все партии →</a>
-            </div>
-            <div class="p-3">
+<!-- Журнал перехваченных нарушений и последние обработки -->
+<section class="dashboard-section">
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="panel h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h6 fw-bold mb-0">🚨 Перехваченные нарушения «Карантинного замка»</h2>
+                    <a asp-controller="Batches" asp-action="Index" class="small text-decoration-none">Все партии →</a>
+                </div>
                 @if (Model.RecentBlockedAttempts.Count == 0)
                 {
-                    <p class="text-muted small mb-0">Нарушений не зафиксировано.</p>
+                    <p class="text-muted small mb-0">Попыток сдачи карантинного сырья не зафиксировано.</p>
                 }
                 else
                 {
                     <div class="d-flex flex-column gap-2">
-                        @foreach (var log in Model.RecentBlockedAttempts)
+                        @foreach (var log in Model.RecentBlockedAttempts.Take(4))
                         {
-                            <div class="p-3 rounded-3 border border-danger border-opacity-50" style="background: var(--vg-danger-soft);">
+                            <div class="p-3 rounded-3 border border-danger border-opacity-50" style="background: var(--agro-danger-soft);">
                                 <div class="d-flex justify-content-between align-items-center small mb-1">
                                     <strong class="text-danger">⛔ Отклонена партия @log.AttemptedBatchNumber</strong>
                                     <span class="text-muted">@log.AttemptedAtUtc.AddHours(8).ToString("dd.MM.yyyy HH:mm")</span>
                                 </div>
                                 <div class="small">@log.BlockMessage</div>
-                                <div class="small text-muted mt-1">Оператор: @log.AttemptedByUser</div>
                             </div>
                         }
                     </div>
                 }
             </div>
         </div>
-    </div>
 
-    <!-- Последние вет-обработки -->
-    <div class="col-lg-6">
-        <div class="vg-card h-100">
-            <div class="vg-card-header">
-                <h6 class="fw-bold mb-0">💉 Последние записи журнала ЛПМ (SQL Temporal Versioning)</h6>
-                <a asp-controller="Audit" asp-action="Index" class="small text-decoration-none">Temporal Аудит →</a>
-            </div>
-            <div class="p-3">
+        <div class="col-lg-6">
+            <div class="panel h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h6 fw-bold mb-0">💉 Последние инъекции ЛПМ (SQL Temporal Versioning)</h2>
+                    <a asp-controller="Audit" asp-action="Index" class="small text-decoration-none">Temporal Аудит →</a>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
                         <thead>
@@ -206,11 +282,11 @@
                                 <th>Дата</th>
                                 <th>Животное</th>
                                 <th>Препарат</th>
-                                <th>Карантин (мол.)</th>
+                                <th>Карантин</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var tr in Model.RecentTreatments)
+                            @foreach (var tr in Model.RecentTreatments.Take(6))
                             {
                                 <tr>
                                     <td class="small text-muted">@tr.AdministeredAtUtc.AddHours(8).ToString("dd.MM HH:mm")</td>
@@ -219,16 +295,8 @@
                                             @(tr.Animal?.Name ?? "—")
                                         </a>
                                     </td>
-                                    <td class="small">
-                                        @tr.DrugNameSnapshot
-                                        @if (tr.IsPotentDrugSnapshot)
-                                        {
-                                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 ms-1">Сильнодейств.</span>
-                                        }
-                                    </td>
-                                    <td class="small fw-semibold">
-                                        @(tr.MilkWithdrawalHoursApplied > 0 ? $"{tr.MilkWithdrawalHoursApplied} ч" : "0 ч")
-                                    </td>
+                                    <td class="small">@tr.DrugNameSnapshot</td>
+                                    <td class="small fw-semibold">@(tr.MilkWithdrawalHoursApplied > 0 ? $"{tr.MilkWithdrawalHoursApplied} ч" : "0 ч")</td>
                                 </tr>
                             }
                         </tbody>
@@ -237,4 +305,92 @@
             </div>
         </div>
     </div>
-</div>
+</section>
+
+<!-- Быстрые сценарии платформы (.quick-actions как в ITS AgroVision V2) -->
+<section class="dashboard-section">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Рабочие модули</p>
+            <h2>Ключевые сценарии платформы VetGuard</h2>
+        </div>
+    </div>
+    <div class="quick-actions">
+        <a asp-controller="Animals" asp-action="Index">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#qr"></use></svg>
+            <strong>Реестр поголовья и QR-паспорта</strong>
+            <span>Карточки КРС, RFID ISO 11784, графики удоев и привесов, стойловые QR-таблички в PDF</span>
+        </a>
+        <a asp-controller="Batches" asp-action="Index">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#lock"></use></svg>
+            <strong>Карантинный замок партий</strong>
+            <span>Жесткая транзакционная блокировка слива молока при активном антибиотике и выдача ВСД</span>
+        </a>
+        <a asp-controller="Treatments" asp-action="Index">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#syringe"></use></svg>
+            <strong>Журнал обработок (ЛПМ)</strong>
+            <span>Автоматический расчет часа выведения препарата, списание серий и живые SignalR-оповещения</span>
+        </a>
+        <a asp-controller="Breeding" asp-action="Index">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#dna"></use></svg>
+            <strong>Племенной радар и Анти-инбридинг</strong>
+            <span>Рекурсивное дерево предков до 6 колен в T-SQL CTE, формула С. Райта и шкала Шапоружа</span>
+        </a>
+        <a asp-controller="Epizootics" asp-action="Index">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#calendar"></use></svg>
+            <strong>Противоэпизоотический план</strong>
+            <span>Сибирская язва, туберкулинизация, бруцеллёз и лейкоз: групповая обработка в 2 клика и PDF-акт</span>
+        </a>
+        <a asp-controller="Audit" asp-action="Index">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#audit"></use></svg>
+            <strong>Неизменяемый Temporal Аудит</strong>
+            <span>Прямой просмотр системных таблиц истории MS SQL Server (SYSTEM_VERSIONING = ON)</span>
+        </a>
+    </div>
+</section>
+
+<!-- Методологический конвейер (.workflow-strip) -->
+<section class="workflow-strip">
+    <strong>Конвейер ветеринарной безопасности:</strong>
+    <span>1. QR-идентификация и клинический осмотр</span>
+    <span>→</span>
+    <span>2. Регистрация ЛПМ в Temporal Table</span>
+    <span>→</span>
+    <span>3. Автоматический Карантинный замок (молоко / мясо)</span>
+    <span>→</span>
+    <span>4. Повторная проверка RowVersion и выдача ВСД в PDF</span>
+</section>
+
+@section Scripts {
+<script>
+    (function () {
+        const nodes = document.querySelectorAll('.irkutsk-node');
+        const titleEl = document.getElementById('farmNodeTitle');
+        const descEl = document.getElementById('farmNodeDesc');
+        const linkEl = document.getElementById('farmNodeLink');
+        const polyEl = document.getElementById('farmNodeSparkPoly');
+
+        function activate(node) {
+            titleEl.textContent = node.getAttribute('data-node-title');
+            descEl.textContent = node.getAttribute('data-node-desc');
+            linkEl.setAttribute('href', node.getAttribute('data-node-link'));
+            const vals = (node.getAttribute('data-node-spark') || '').split(',').map(Number).filter(n => !Number.isNaN(n));
+            if (vals.length > 1) {
+                const min = Math.min(...vals), max = Math.max(...vals), span = max > min ? max - min : 1;
+                const pts = vals.map((v, i) => `${(8 + 202 * i / (vals.length - 1)).toFixed(1)},${(38 - 30 * (v - min) / span).toFixed(1)}`).join(' ');
+                polyEl.setAttribute('points', pts);
+            }
+        }
+
+        nodes.forEach(n => {
+            n.addEventListener('click', () => activate(n));
+            n.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    activate(n);
+                }
+            });
+        });
+    })();
+</script>
+}

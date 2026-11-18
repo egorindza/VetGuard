@@ -1,164 +1,227 @@
 ﻿@{
-    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "Home";
+    var controller = ViewContext.RouteData.Values["controller"]?.ToString() ?? "Home";
+    var action = ViewContext.RouteData.Values["action"]?.ToString() ?? "Index";
+    var homeActive = controller == "Home" && action == "Index";
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
-    var userName = isAuthenticated ? User.Identity!.Name : "Гостевой обзор (Выберите демо-роль)";
-    var roleTitle = User.FindFirst("RoleTitle")?.Value ?? "Демо-режим ИрГАУ";
+    var userName = isAuthenticated ? User.Identity!.Name : "Гостевой режим";
+    var roleTitle = User.FindFirst("RoleTitle")?.Value ?? "Выберите демо-роль в 1 клик";
     var roleBadge = User.FindFirst("BadgeIcon")?.Value ?? "🎓";
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
+
+    (string SectionTitle, string SectionUrl)? parentCrumb = controller switch
+    {
+        "Animals" => ("Поголовье и QR-паспорта", "/Animals"),
+        "Passport" => ("Мобильный QR-осмотр у стойла", "/Animals"),
+        "Treatments" => ("Журнал ЛПМ", "/Treatments"),
+        "Drugs" => ("Справочник ветпрепаратов", "/Drugs"),
+        "Batches" => ("Партии и Карантинный замок", "/Batches"),
+        "Breeding" => ("Племенной радар (CTE)", "/Breeding"),
+        "Epizootics" => ("Эпизоотология и Изолятор", "/Epizootics"),
+        "Audit" => ("Аудит Temporal Tables", "/Audit"),
+        "Account" => ("Демо-вход по ролям", "/Account/Login"),
+        _ => null
+    };
 }
 <!DOCTYPE html>
 <html lang="ru" data-theme="light" data-bs-theme="light">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@ViewData["Title"] — VetGuard ИрГАУ</title>
     <script>
         (function () {
-            var saved = localStorage.getItem("vetguard-theme") || "light";
-            document.documentElement.setAttribute("data-theme", saved);
-            document.documentElement.setAttribute("data-bs-theme", saved);
+            try {
+                var saved = localStorage.getItem("vetguard-theme");
+                if (saved === "dark" || saved === "light") {
+                    document.documentElement.setAttribute("data-theme", saved);
+                    document.documentElement.setAttribute("data-bs-theme", saved);
+                }
+            } catch (e) { }
         })();
     </script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-xl vg-navbar navbar-dark py-2">
-            <div class="container-fluid px-3 px-lg-4">
-                <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-white" asp-controller="Home" asp-action="Index">
-                    <span class="fs-4">🛡️</span>
-                    <span>
-                        VetGuard <span class="badge bg-success bg-opacity-75 fw-semibold ms-1" style="font-size:0.7rem;">ИрГАУ</span>
-                        <small class="d-block fw-normal opacity-75" style="font-size:0.68rem; line-height:1;">QR-паспорта • Карантинный замок • Селекция</small>
-                    </span>
-                </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#vgMainNav">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
+<a class="skip-link" href="#main-content">К основному содержимому</a>
 
-                <div class="collapse navbar-collapse" id="vgMainNav">
-                    <ul class="navbar-nav me-auto mb-2 mb-xl-0 gap-1 ms-xl-3">
-                        <li class="nav-item">
-                            <a class="nav-link @(currentController == "Home" ? "active" : "")" asp-controller="Home" asp-action="Index">📊 Сводка</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @(currentController == "Animals" ? "active" : "")" asp-controller="Animals" asp-action="Index">🐄 Поголовье & QR</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @(currentController == "Treatments" ? "active" : "")" asp-controller="Treatments" asp-action="Index">💉 Журнал ЛПМ</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @(currentController == "Drugs" ? "active" : "")" asp-controller="Drugs" asp-action="Index">💊 Ветпрепараты</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @(currentController == "Batches" ? "active" : "")" asp-controller="Batches" asp-action="Index">🔒 Партии & Замок</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @(currentController == "Breeding" ? "active" : "")" asp-controller="Breeding" asp-action="Index">🧬 Племенной радар</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @(currentController == "Epizootics" ? "active" : "")" asp-controller="Epizootics" asp-action="Index">🗓️ Эпизоотология</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @(currentController == "Audit" ? "active" : "")" asp-controller="Audit" asp-action="Index">📜 Temporal Аудит</a>
-                        </li>
-                    </ul>
+<header class="mobile-header">
+    <a class="mobile-brand" asp-controller="Home" asp-action="Index">
+        <span class="brand-mark" aria-hidden="true"></span> ИрГАУ VetGuard
+    </a>
+    <button class="menu-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavigation" aria-controls="mainNavigation" aria-expanded="false" aria-label="Открыть или закрыть навигацию">
+        <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+    </button>
+</header>
 
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <span class="badge rounded-pill bg-dark bg-opacity-50 border border-light border-opacity-25 px-2 py-1 d-inline-flex align-items-center gap-1">
-                            <span class="vg-online-dot"></span>
-                            <span id="signalr-status-text" style="font-size:0.72rem;">SignalR...</span>
-                        </span>
+<div class="app-frame">
+    <!-- Боковая навигационная панель в едином стиле с ITS AgroVision V2 -->
+    <aside class="app-sidebar collapse" id="mainNavigation">
+        <a class="app-brand" asp-controller="Home" asp-action="Index">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span>ИрГАУ <strong>VetGuard</strong><small>Ветеринария и Селекция · V1</small></span>
+        </a>
 
-                        <button type="button" id="vg-theme-btn" onclick="toggleVetGuardTheme()" class="btn btn-sm btn-outline-light py-1 px-2">
-                            🌙 Тёмная
-                        </button>
+        <nav aria-label="Основная навигация">
+            <p class="nav-caption">Оперативный контур</p>
+            <a class="side-link @(homeActive ? "active" : "")" aria-current="@(homeActive ? "page" : null)" asp-controller="Home" asp-action="Index">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#home"></use></svg>Обзор и сводка
+            </a>
+            <a class="side-link @(controller == "Animals" || controller == "Passport" ? "active" : "")" asp-controller="Animals" asp-action="Index">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#qr"></use></svg>Поголовье и QR-паспорта
+            </a>
 
-                        <a asp-controller="Account" asp-action="Login" class="btn btn-sm btn-light fw-semibold py-1 px-2 text-dark">
-                            @roleBadge @roleTitle
-                        </a>
-                    </div>
-                </div>
-            </div>
+            <p class="nav-caption">Ветеринария и Карантин</p>
+            <a class="side-link @(controller == "Treatments" ? "active" : "")" asp-controller="Treatments" asp-action="Index">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#syringe"></use></svg>Журнал ЛПМ (инъекции)
+            </a>
+            <a class="side-link @(controller == "Batches" ? "active" : "")" asp-controller="Batches" asp-action="Index">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#lock"></use></svg>Партии и Карантин-замок
+            </a>
+            <a class="side-link @(controller == "Drugs" ? "active" : "")" asp-controller="Drugs" asp-action="Index">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#pill"></use></svg>Справочник препаратов
+            </a>
+            <a class="side-link @(controller == "Epizootics" ? "active" : "")" asp-controller="Epizootics" asp-action="Index">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#calendar"></use></svg>Эпизоотология и Изолятор
+            </a>
+
+            <p class="nav-caption">Селекция и Аудит СУБД</p>
+            <a class="side-link @(controller == "Breeding" ? "active" : "")" asp-controller="Breeding" asp-action="Index">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#dna"></use></svg>Племенной радар (CTE)
+            </a>
+            <a class="side-link @(controller == "Audit" ? "active" : "")" asp-controller="Audit" asp-action="Index">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#audit"></use></svg>Аудит Temporal Tables
+            </a>
+
+            <p class="nav-caption">Профиль и Стенд</p>
+            <a class="side-link @(controller == "Account" ? "active" : "")" asp-controller="Account" asp-action="Login">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#user"></use></svg>Демо-вход по ролям
+            </a>
         </nav>
 
-        <!-- Панель мгновенного демо-переключения ролей в 1 клик -->
-        <div class="vg-demo-strip">
-            <div class="container-fluid px-3 px-lg-4 d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <span class="text-muted fw-semibold">Текущий пост:</span>
-                    <span class="fw-bold">@roleBadge @userName</span>
-                    <span class="badge bg-secondary bg-opacity-10 text-body border">@roleTitle</span>
-                </div>
-
-                <div class="d-flex align-items-center gap-1 flex-wrap">
-                    <span class="text-muted me-1">Быстрый демо-вход в 1 клик:</span>
-                    @foreach (var profile in DemoRoles.Profiles)
-                    {
-                        var isActiveRole = User.IsInRole(profile.Role);
-                        <form asp-controller="Account" asp-action="DemoLogin" method="post" class="d-inline">
-                            <input type="hidden" name="roleKey" value="@profile.Key" />
-                            <input type="hidden" name="returnUrl" value="@returnUrl" />
-                            <button type="submit" class="btn btn-sm @(isActiveRole ? "btn-vg-primary" : "btn-outline-secondary") py-0 px-2" style="font-size:0.78rem;">
-                                @profile.BadgeIcon @profile.RoleTitle
-                            </button>
-                        </form>
-                    }
-                </div>
+        <div class="sidebar-user-box mt-3">
+            <strong>@roleBadge @userName</strong>
+            <span>@roleTitle</span>
+            <div class="sidebar-role-pills">
+                @foreach (var profile in DemoRoles.Profiles)
+                {
+                    var active = User.IsInRole(profile.Role);
+                    <form asp-controller="Account" asp-action="DemoLogin" method="post" class="d-inline">
+                        <input type="hidden" name="roleKey" value="@profile.Key" />
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <button type="submit" class="sidebar-role-btn @(active ? "active" : "")" title="Мгновенно войти как @profile.RoleTitle">
+                            @profile.BadgeIcon @(profile.Key == DemoRoles.ChiefVet ? "Ветврач" : profile.Key == DemoRoles.Zootechnician ? "Селекционер" : "Бригадир")
+                        </button>
+                    </form>
+                }
             </div>
         </div>
-    </header>
+        <p class="sidebar-note">Учхоз «Молодёжное» · Иркутский ГАУ</p>
+    </aside>
 
-    <main class="container-fluid px-3 px-lg-4 py-4">
-        @if (TempData["SuccessMessage"] is string okMsg)
-        {
-            <div class="alert alert-success alert-dismissible fade show shadow-sm border-success" role="alert">
-                <strong>✓ Выполнено:</strong> @okMsg
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <!-- Рабочая область -->
+    <div class="app-workspace">
+        <header class="workspace-header">
+            <div class="workspace-header-left">
+                <span>ИрГАУ VetGuard</span>
+                <span class="version-pill">
+                    <span class="vg-online-dot"></span>
+                    <span id="signalr-status-text">SignalR...</span>
+                </span>
+                <span class="d-none d-xl-inline">QR-паспорта поголовья, контроль выведения ветпрепаратов и анти-инбридинг</span>
             </div>
-        }
-        @if (TempData["ErrorMessage"] is string errMsg)
-        {
-            <div class="alert alert-danger alert-dismissible fade show shadow-sm border-danger" role="alert">
-                <strong>⛔ Внимание / Доменное ограничение:</strong> @errMsg
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        }
-        @if (TempData["InfoMessage"] is string infoMsg)
-        {
-            <div class="alert alert-info alert-dismissible fade show shadow-sm" role="alert">
-                @infoMsg
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        }
 
-        @RenderBody()
-    </main>
-
-    <footer class="border-top py-3 mt-4" style="border-color: var(--vg-border) !important;">
-        <div class="container-fluid px-3 px-lg-4 d-flex flex-wrap justify-content-between align-items-center small text-muted gap-2">
-            <div>
-                <strong>VetGuard v1.0</strong> — Система ветеринарных QR-паспортов, «Карантинного замка» и племенного подбора пар (ФГБОУ ВО Иркутский ГАУ)
+            <div class="workspace-header-right">
+                <button type="button" id="cmdkOpenBtn" class="cmdk-trigger-btn" title="Быстрый поиск по разделам, биркам и препаратам (Ctrl+K)">
+                    <span>🔍 Быстрый переход</span>
+                    <kbd class="cmdk-kbd">Ctrl K</kbd>
+                </button>
+                <button type="button" id="themeToggleBtn" onclick="toggleVetGuardTheme()" class="theme-toggle-btn">☾ Тёмная</button>
+                <a asp-controller="Account" asp-action="Login" class="btn btn-sm btn-outline-primary py-1 px-2">
+                    @roleBadge @(isAuthenticated ? User.FindFirst("RoleTitle")?.Value : "Демо-роль")
+                </a>
             </div>
-            <div>
-                БД: <code>IrGau_VetGuardDb</code> (MS SQL Temporal Tables + Recursive CTE + RowVersion) • Порт: <code>5104</code>
-            </div>
-        </div>
-    </footer>
+        </header>
 
-    <!-- Универсальное модальное окно для HTMX-форм -->
-    <div id="vg-modal-backdrop" class="vg-modal-backdrop" onclick="if(event.target===this) closeVgModal();">
-        <div id="vg-modal-content" class="vg-modal-dialog"></div>
+        <main id="main-content" class="app-main">
+            <div class="app-shell">
+                @if (!homeActive && parentCrumb is { } crumb)
+                {
+                    <nav class="agro-breadcrumbs no-print" aria-label="Навигационная цепочка">
+                        <a asp-controller="Home" asp-action="Index">Обзор</a>
+                        <span class="crumb-sep">/</span>
+                        @if (action == "Index" && controller != "Passport")
+                        {
+                            <span class="crumb-current">@crumb.SectionTitle</span>
+                        }
+                        else
+                        {
+                            <a href="@crumb.SectionUrl">@crumb.SectionTitle</a>
+                            <span class="crumb-sep">/</span>
+                            <span class="crumb-current">@ViewData["Title"]</span>
+                        }
+                    </nav>
+                }
+
+                @if (TempData["SuccessMessage"] is string okMsg)
+                {
+                    <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+                        <strong>✓ Выполнено:</strong> @okMsg
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                @if (TempData["ErrorMessage"] is string errMsg)
+                {
+                    <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+                        <strong>⛔ Доменное ограничение:</strong> @errMsg
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                @if (TempData["InfoMessage"] is string infoMsg)
+                {
+                    <div class="alert alert-info alert-dismissible fade show shadow-sm" role="alert">
+                        @infoMsg
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+
+                @RenderBody()
+            </div>
+        </main>
+
+        <footer class="app-footer">
+            <div class="app-shell">
+                <span>ИрГАУ VetGuard · Система ветеринарно-санитарного контроля и селекции КРС</span>
+                <span>СУБД: IrGau_VetGuardDb (Temporal + CTE + RowVersion) · Порт: 5104 · Поиск: Ctrl+K</span>
+            </div>
+        </footer>
     </div>
+</div>
 
-    <!-- Контейнер живых SignalR-уведомлений -->
-    <div id="signalr-toast-container" class="vg-toast-stack"></div>
+<!-- Командная палитра быстрого перехода Command Palette (Ctrl + K) -->
+<div id="cmdkBackdrop" class="cmdk-backdrop no-print" role="dialog" aria-modal="true" aria-label="Быстрый переход по платформе">
+    <div class="cmdk-modal">
+        <div class="cmdk-header">
+            <span>🔍</span>
+            <input id="cmdkInput" type="search" class="cmdk-input" placeholder="Введите раздел, кличку, номер бирки (RU-38-IRGAU-0107) или препарат…" autocomplete="off" />
+            <kbd class="cmdk-kbd">Esc</kbd>
+        </div>
+        <ul id="cmdkList" class="cmdk-list"></ul>
+    </div>
+</div>
 
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/lib/vendor/htmx.min.js"></script>
-    <script src="~/lib/vendor/signalr.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
-    @await RenderSectionAsync("Scripts", required: false)
+<!-- Универсальное модальное окно для HTMX-форм -->
+<div id="vg-modal-backdrop" class="vg-modal-backdrop no-print" onclick="if(event.target===this) closeVgModal();">
+    <div id="vg-modal-content" class="vg-modal-dialog"></div>
+</div>
+
+<!-- Живые SignalR-уведомления -->
+<div id="signalr-toast-container" class="vg-toast-stack no-print"></div>
+
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/lib/vendor/htmx.min.js"></script>
+<script src="~/lib/vendor/signalr.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

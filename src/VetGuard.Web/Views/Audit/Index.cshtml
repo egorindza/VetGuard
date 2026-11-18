@@ -3,15 +3,16 @@
     ViewData["Title"] = "Неизменяемый ветеринарный аудит (SQL Server Temporal Tables)";
 }
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+<header class="page-header">
     <div>
-        <h2 class="fw-bold mb-1">📜 Неизменяемый ветеринарный аудит (<code>SYSTEM_VERSIONING = ON</code>)</h2>
-        <p class="text-muted mb-0">
-            Прямое чтение системно-версионируемых таблиц MS SQL Server (<code>FOR SYSTEM_TIME ALL</code>): история введения сильнодействующих препаратов (<code>TreatmentRecordsHistory</code>) и переходов статусов здоровья (<code>AnimalsHistory</code>)
+        <p class="eyebrow">Системное версионирование MS SQL Server</p>
+        <h1>Неизменяемый ветеринарный аудит (<code>SYSTEM_VERSIONING = ON</code>)</h1>
+        <p class="page-description">
+            Прямое чтение темпоральных таблиц (<code>FOR SYSTEM_TIME ALL</code>): история введения сильнодействующих препаратов (<code>TreatmentRecordsHistory</code>) и смены статусов здоровья (<code>AnimalsHistory</code>).
         </p>
     </div>
 
-    <form method="get" class="d-flex align-items-center gap-2">
+    <form method="get" class="header-actions">
         <select name="animalId" class="form-select form-select-sm" style="min-width: 250px;" onchange="this.form.submit()">
             <option value="">Все животные стада ИрГАУ</option>
             @foreach (var a in Model.ActiveAnimals)
@@ -24,7 +25,7 @@
             <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Сбросить</a>
         }
     </form>
-</div>
+</header>
 
 <!-- 1. Системно-версионируемый журнал сильнодействующих ветпрепаратов -->
 <div class="vg-card mb-4">
